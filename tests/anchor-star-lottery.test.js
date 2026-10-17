@@ -87,10 +87,11 @@ test("运行中停止等待当前批次结束，不继续后续请求", async ()
   const run = env.run();
   while (!release) await new Promise(resolve => setImmediate(resolve));
   env.context.anchorStarLottery.stop = true;
-  release(response({ error: 0, data: {} }));
+  release(response({ error: 0, data: { prizeList: [{ prizeDesc: "星光棒", prizeNum: 66 }] } }));
   await run;
   assert.equal(env.calls.length, 2);
   assert.match(env.statuses.at(-1), /已停止：完成 10\/23 次/);
+  assert.match(env.statuses.at(-1), /获得星光棒 66 个/);
 });
 
 test("读取余额时停止，不发送POST", async () => {
@@ -203,7 +204,10 @@ test("异步挂载、幂等初始化、重建后保留控件及停止状态", as
   dom.observers[0].callback();
   assert.equal(dom.document.balance.children.length, 1);
   const controls = dom.document.balance.children[0];
-  const [start, stop, status] = controls.children;
+  const [start, stop] = controls.children;
+  const status = dom.document.body.children.find(child => child.id === "ex-anchor-star-lottery-status");
+  assert.ok(status, "提示应挂载到 body，脱离余额区域层叠上下文");
+  assert.equal(controls.contains(status), false);
   assert.equal(stop.hidden, true);
   let release;
   env.context.fetch = () => new Promise(resolve => { release = resolve; });
@@ -249,4 +253,46 @@ test("源码完整拼接后能在活动页启动，且不会初始化直播间�
   dom.document.balance = new dom.Element("div");
   dom.observers[0].callback();
   assert.equal(dom.document.balance.children[0].id, "ex-anchor-star-lottery");
+});
+
+
+test("跨批次累加星光棒，排除金币和其他奖品，每次启动重新计数", async () => {
+  const env = setup({ coins: 110, lottery: () => response({ error: 0, data: { prizeList: [
+    { prizeDesc: "星光棒", prizeNum: 20 },
+    { prizeDesc: "星光棒", prizeNum: "10" },
+    { prizeDesc: "金币", prizeNum: 5 },
+    { prizeDesc: "鉴星官勋章", prizeNum: 1 }
+  ] } }) });
+  await env.run();
+  assert.match(env.statuses.at(-1), /抽奖完毕.*获得星光棒 60 个/);
+  await env.run();
+  assert.match(env.statuses.at(-1), /获得星光棒 60 个/);
+});
+
+test("后续请求失败保留已确认星光棒数量", async () => {
+  let batch = 0;
+  const env = setup({ lottery: () => {
+    if (++batch > 1) throw new Error("网络中断，当前批次结果未确认");
+    return response({ error: 0, data: { prizeList: [{ prizeDesc: "星光棒", prizeNum: 500 }] } });
+  } });
+  await env.run();
+  assert.match(env.statuses.at(-1), /已确认完成 10 次，获得星光棒 500 个/);
+});
+
+test("完整奖励中没有星光棒时显示零，缺失或异常奖励标注统计不完整", async () => {
+  const env = setup({ coins: 10, lottery: () => response({ error: 0, data: { prizeList: [{ prizeDesc: "金币", prizeNum: 5 }] } }) });
+  await env.run();
+  assert.match(env.statuses.at(-1), /获得星光棒 0 个/);
+  assert.doesNotMatch(env.statuses.at(-1), /未能读取/);
+  for (const data of [undefined, {}, { prizeList: [] }, { prizeList: [null] },
+    { prizeList: [{ prizeDesc: "星光棒", prizeNum: "bad" }] },
+    { prizeList: [{ prizeDesc: "星光棒", prizeNum: -1 }] },
+    { prizeList: [{ prizeDesc: "星光棒", prizeNum: 0.5 }] },
+    { prizeList: [{ prizeDesc: "星光棒", prizeNum: 10 }, {}] }
+  ]) {
+    const env = setup({ coins: 10, lottery: () => response({ error: 0, data }) });
+    await env.run();
+    assert.match(env.statuses.at(-1), /完成 1\/1 次/);
+    assert.match(env.statuses.at(-1), /部分奖励未能读取/);
+  }
 });

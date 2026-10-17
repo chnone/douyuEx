@@ -14,8 +14,8 @@ function initPkg_AnchorStarLottery() {
     #ex-anchor-star-lottery button:active:not(:disabled) { filter:brightness(.96); box-shadow:inset 0 1px 3px #3847aa55; }
     #ex-anchor-star-lottery button:disabled { opacity:.6; cursor:default; }
     #ex-anchor-star-lottery button:focus-visible { outline:2px solid #4a55cd; outline-offset:2px; }
-    #ex-anchor-star-lottery [role=status] { position:fixed; bottom:16px; left:16px; z-index:99999; box-sizing:border-box; width:280px; max-width:calc(100vw - 32px); padding:10px 12px; border:1px solid #e4f5ff; border-radius:12px; background:linear-gradient(135deg,#edfaff,#e7e7ff); box-shadow:0 3px 12px #4359c526; color:#3b51a4; white-space:normal; overflow-wrap:anywhere; cursor:default; }
-    #ex-anchor-star-lottery [role=status]:empty { display:none; }
+    #ex-anchor-star-lottery-status { position:fixed; bottom:16px; left:16px; z-index:2147483647; box-sizing:border-box; width:280px; max-width:calc(100vw - 32px); padding:10px 12px; border:1px solid #e4f5ff; border-radius:12px; background:linear-gradient(135deg,#edfaff,#e7e7ff); box-shadow:0 3px 12px #4359c526; color:#3b51a4; font:12px/1.5 "Microsoft YaHei",sans-serif; text-align:left; pointer-events:none; white-space:normal; overflow-wrap:anywhere; cursor:default; }
+    #ex-anchor-star-lottery-status:empty { display:none; }
   `;
   document.head.appendChild(style);
 
@@ -30,9 +30,12 @@ function initPkg_AnchorStarLottery() {
   stop.textContent = "停止";
   stop.hidden = true;
   const status = document.createElement("span");
+  status.id = "ex-anchor-star-lottery-status";
   status.setAttribute("role", "status");
   status.setAttribute("aria-live", "polite");
-  controls.append(start, stop, status);
+  controls.append(start, stop);
+  // 脱离余额区域的层叠上下文，防止任务奖品图标盖住提示。
+  document.body.appendChild(status);
 
   const view = {
     status(text) { status.textContent = text; },
@@ -113,12 +116,39 @@ async function AnchorStarLottery_request(path, num, roomId) {
   }
 }
 
+// 抽奖结果与官方奖品弹窗共用 prizeList / prizeDesc / prizeNum 字段。
+function AnchorStarLottery_rewards(data) {
+  let count = 0;
+  let complete = true;
+  if (!data || !Array.isArray(data.prizeList) || !data.prizeList.length) return { count, complete: false };
+  for (const prize of data.prizeList) {
+    if (!prize || typeof prize.prizeDesc !== "string" || !prize.prizeDesc.trim()) {
+      complete = false;
+      continue;
+    }
+    if (prize.prizeDesc.trim() !== "星光棒") continue;
+    const raw = prize.prizeNum;
+    const num = typeof raw === "number" || (typeof raw === "string" && /^\d+$/.test(raw)) ? Number(raw) : NaN;
+    if (!Number.isSafeInteger(num) || num < 0 || !Number.isSafeInteger(count + num)) {
+      complete = false;
+      continue;
+    }
+    count += num;
+  }
+  return { count, complete };
+}
+
 async function AnchorStarLottery_run(view) {
   if (anchorStarLottery.running || anchorStarLottery.needsReload) return;
   anchorStarLottery.running = true;
   anchorStarLottery.stop = false;
   let completed = 0;
   let total = 0;
+  let starSticks = 0;
+  let rewardsComplete = true;
+  const rewardSummary = () => rewardsComplete
+    ? `获得星光棒 ${starSticks} 个`
+    : `已确认获得星光棒 ${starSticks} 个（部分奖励未能读取，请核对探索记录）`;
   view.busy(true);
   try {
     view.status("正在读取最新金币余额…");
@@ -136,16 +166,19 @@ async function AnchorStarLottery_run(view) {
     while (completed < total && !anchorStarLottery.stop) {
       const num = total - completed >= 10 ? 10 : 1;
       view.status(`抽奖中：已完成 ${completed}/${total} 次`);
-      await AnchorStarLottery_request("/user/lottery/do", num, roomId);
+      const result = await AnchorStarLottery_request("/user/lottery/do", num, roomId);
       completed += num;
+      const rewards = AnchorStarLottery_rewards(result);
+      starSticks += rewards.count;
+      rewardsComplete = rewardsComplete && rewards.complete;
       view.status(`抽奖中：已完成 ${completed}/${total} 次`);
       if (completed < total && !anchorStarLottery.stop) await sleep(500);
     }
-    view.status(`${completed === total ? "抽奖完毕" : "已停止"}：完成 ${completed}/${total} 次，消耗 ${completed * 10} 金币。刷新页面查看余额和探索记录。`);
+    view.status(`${completed === total ? "抽奖完毕" : "已停止"}：完成 ${completed}/${total} 次，消耗 ${completed * 10} 金币，${rewardSummary()}。刷新页面查看余额和探索记录。`);
   } catch (error) {
     // POST 超时或断网时服务端可能已扣币，禁止自动重试或继续下一批。
     anchorStarLottery.needsReload = true;
-    view.status(`已停止，已确认完成 ${completed} 次：${error.message || "请求失败"}。请刷新页面核对余额和探索记录后重试。`);
+    view.status(`已停止，已确认完成 ${completed} 次，${rewardSummary()}：${error.message || "请求失败"}。请刷新页面核对余额和探索记录后重试。`);
   } finally {
     anchorStarLottery.running = false;
     view.busy(false);
