@@ -86,3 +86,22 @@ test('钓鱼活动路由只加载领奖模块，其他站点和直播间不受�
   context.initRouter('https://www.douyu.com/123?next=/pages/fish-act/');
   assert.deepEqual(calls, ['fish', 'room']);
 });
+
+test('左下角通知仅接受同源钓鱼 iframe，奖励名称按纯文本显示', () => {
+  const messages = [], sourceWindow = {}, handlers = {};
+  const context = vm.createContext({ URL,
+    window: { location: { origin: 'https://www.douyu.com', href: 'https://www.douyu.com/123' }, addEventListener: (type, handler) => { handlers[type] = handler; } },
+    document: { querySelectorAll: () => [{ contentWindow: sourceWindow, src: 'https://www.douyu.com/pages/fish-act/?rid=123' }] },
+    showMessage: (...args) => messages.push(args)
+  });
+  vm.runInContext(source, context);
+  context.initPkg_FishWeeklyRewards_NoticeBridge();
+  const event = { origin: 'https://www.douyu.com', source: sourceWindow, data: { type: 'douyuex:fish-weekly-reward-notice', text: '<img src=x onerror=alert(1)>', level: 'success' } };
+  handlers.message({ ...event, origin: 'https://evil.example' });
+  handlers.message({ ...event, source: {} });
+  assert.equal(messages.length, 0);
+  handlers.message(event);
+  assert.equal(messages.length, 1);
+  assert.match(messages[0][0], /&lt;img/);
+  assert.doesNotMatch(messages[0][0], /<img/);
+});

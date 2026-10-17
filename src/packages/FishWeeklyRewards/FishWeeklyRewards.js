@@ -102,7 +102,15 @@ function initPkg_FishWeeklyRewards() {
   document.head.appendChild(style);
   const view = {
     active, cards, popup,
-    status(text) { status.textContent = text; },
+    status(text) {
+      status.textContent = text;
+      // 只通知关键结果，避免每个等待步骤刷屏；直播间沿用统一左下角提示。
+      if (/^(已领取 |领取结束|已停止：|本周暂无)/.test(text) && window.parent !== window) {
+        window.parent.postMessage({ type: "douyuex:fish-weekly-reward-notice", text,
+          level: text.includes("请刷新核对") ? "error" : text.startsWith("已停止") ? "info" : "success"
+        }, window.location.origin);
+      }
+    },
     busy(value) {
       controls.classList.toggle("is-running", value);
       if (value) document.body.appendChild(controls);
@@ -160,5 +168,27 @@ function initPkg_FishWeeklyRewards() {
   window.addEventListener("pagehide", () => { fishWeeklyRewards.stop = true; observer.disconnect(); });
   window.addEventListener("pageshow", event => {
     if (event.persisted) { mount(); observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] }); }
+  });
+}
+
+
+var fishWeeklyNoticeBridgeInitialized = false;
+function initPkg_FishWeeklyRewards_NoticeBridge() {
+  if (fishWeeklyNoticeBridgeInitialized) return;
+  fishWeeklyNoticeBridgeInitialized = true;
+  window.addEventListener("message", event => {
+    const data = event.data;
+    if (event.origin !== window.location.origin || !data || data.type !== "douyuex:fish-weekly-reward-notice") return;
+    const isFishFrame = Array.from(document.querySelectorAll("iframe")).some(frame => {
+      if (frame.contentWindow !== event.source) return false;
+      try {
+        const url = new URL(frame.src, window.location.href);
+        return url.origin === window.location.origin && /^\/pages\/fish-act(?:\/|$)/.test(url.pathname);
+      } catch (_) { return false; }
+    });
+    if (!isFishFrame || typeof data.text !== "string" || data.text.length > 2000) return;
+    // NoticeJs 支持 HTML，来自活动页的奖励名称必须先转义。
+    const text = data.text.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+    showMessage(`【周图鉴】${text}`, ["success", "info", "error"].includes(data.level) ? data.level : "info", { timeout: 50 });
   });
 }
