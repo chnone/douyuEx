@@ -18,6 +18,7 @@
 // @match			*://*.douyu.com/9*
 // @match			*://*.douyu.com/beta/*
 // @match			*://*.douyu.com/topic/*
+// @match        *://*.douyu.com/pages/new-anchor-support/*
 // @match        *://www.douyu.com/member/cp/getFansBadgeList
 // @match        *://passport.douyu.com/*
 // @match        *://msg.douyu.com/*

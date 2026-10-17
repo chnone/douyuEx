@@ -100,13 +100,12 @@ function extractHeader(code) {
 }
 
 function build() {
+  if (!fs.existsSync("./dist")) fs.mkdirSync("./dist");
   generateVersion();
   handleFolder("./src", "main.js");
   css = css.replace(/\r\n/g, "");
   let template = fs.readFileSync("./src/main.js", "utf8");
   template = template.replace("/*编译器标记 勿删*/", css).replace("// 编译器标记 勿删", js);
-
-  if (!fs.existsSync("./dist")) fs.mkdirSync("./dist");
 
   const { header, body } = extractHeader(template);
   const shakenBody = treeShake(body);
