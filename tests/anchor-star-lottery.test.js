@@ -13,6 +13,7 @@ function response(body, status = 200) {
 function setup({ coins = 237, lottery, info, href = "https://www.douyu.com/pages/new-anchor-support/?rid=123", referrer = "" } = {}) {
   const calls = [], statuses = [], busy = [];
   let active = 0, maxActive = 0;
+  let balance = coins;
   const context = vm.createContext({
     URL, URLSearchParams, AbortController, setTimeout, clearTimeout,
     window: { location: { href } }, document: { referrer },
@@ -21,15 +22,18 @@ function setup({ coins = 237, lottery, info, href = "https://www.douyu.com/pages
       calls.push({ url, options });
       maxActive = Math.max(maxActive, ++active);
       try {
-        return await (options.method === "POST"
-          ? lottery ? lottery(url, options) : response({ error: 0, data: {} })
-          : info ? info() : response({ error: 0, data: { myCoin: coins } }));
+        if (options.method === "POST") {
+          const result = await (lottery ? lottery(url, options) : response({ error: 0, data: {} }));
+          balance = Number(balance) - Number(new URLSearchParams(options.body).get("num")) * 10;
+          return result;
+        }
+        return await (info ? info() : response({ error: 0, data: { myCoin: balance } }));
       } finally { active--; }
     }
   });
   vm.runInContext(source, context);
   const view = { status: text => statuses.push(text), busy: value => busy.push(value) };
-  return { context, calls, statuses, busy, view, maxActive: () => maxActive, run: () => context.AnchorStarLottery_run(view) };
+  return { context, calls, statuses, busy, view, maxActive: () => maxActive, refill: value => { balance = value; }, run: () => context.AnchorStarLottery_run(view) };
 }
 
 test("237金币分成两次十连和三次单抽；串行且编码参数", async () => {
@@ -45,7 +49,7 @@ test("237金币分成两次十连和三次单抽；串行且编码参数", async
     assert.equal(options.credentials, "include");
     assert.notEqual(options.mode, "no-cors");
   }
-  assert.match(env.statuses.at(-1), /完成 23\/23 次，消耗 230 金币/);
+  assert.match(env.statuses.at(-1), /完成 23 次，累计消耗 230 金币/);
   assert.deepEqual(env.busy, [true, false]);
 });
 
@@ -75,7 +79,7 @@ test("重复点击只启动一条队列，下一次点击重新读取余额", as
   while (!release) await new Promise(resolve => setImmediate(resolve));
   release(response({ error: "0", data: {} }));
   await first;
-  assert.equal(env.calls.length, 2);
+  assert.equal(env.calls.length, 3);
   env.context.fetch = async () => response({ error: 0, data: { myCoin: 0 } });
   await env.run();
   assert.match(env.statuses.at(-1), /金币不足10/);
@@ -90,7 +94,7 @@ test("运行中停止等待当前批次结束，不继续后续请求", async ()
   release(response({ error: 0, data: { prizeList: [{ prizeDesc: "星光棒", prizeNum: 66 }] } }));
   await run;
   assert.equal(env.calls.length, 2);
-  assert.match(env.statuses.at(-1), /已停止：完成 10\/23 次/);
+  assert.match(env.statuses.at(-1), /已停止：完成 10 次/);
   assert.match(env.statuses.at(-1), /获得星光棒 66 个/);
 });
 
@@ -131,7 +135,7 @@ test("后续批次失败仅累计已确认成功的次数", async () => {
   let count = 0;
   const env = setup({ lottery: () => response(++count === 1 ? { error: 0 } : { error: 1, message: "失败" }) });
   await env.run();
-  assert.equal(env.calls.length, 3);
+  assert.equal(env.calls.length, 4);
   assert.match(env.statuses.at(-1), /已确认完成 10 次/);
 });
 
@@ -221,7 +225,7 @@ test("异步挂载、幂等初始化、重建后保留控件及停止状态", as
   stop.listeners.click();
   release(response({ error: 0, data: { myCoin: 100 } }));
   await run;
-  assert.match(status.textContent, /已停止：完成 0\/10 次/);
+  assert.match(status.textContent, /已停止：完成 0 次/);
   assert.equal(start.disabled, false);
   assert.equal(stop.hidden, true);
   dom.events.pagehide();
@@ -266,6 +270,7 @@ test("跨批次累加星光棒，排除金币和其他奖品，每次启动重�
   ] } }) });
   await env.run();
   assert.match(env.statuses.at(-1), /抽奖完毕.*获得星光棒 60 个/);
+  env.refill(110);
   await env.run();
   assert.match(env.statuses.at(-1), /获得星光棒 60 个/);
 });
@@ -293,7 +298,45 @@ test("完整奖励中没有星光棒时显示零，缺失或异常奖励标注�
   ]) {
     const env = setup({ coins: 10, lottery: () => response({ error: 0, data }) });
     await env.run();
-    assert.match(env.statuses.at(-1), /完成 1\/1 次/);
+    assert.match(env.statuses.at(-1), /完成 1 次/);
     assert.match(env.statuses.at(-1), /部分奖励未能读取/);
   }
+});
+
+test("返还金币继续抽：1000金币加50返还可抽105次，每批先核对余额", async () => {
+  let balance = 1000, batches = 0;
+  const env = setup({
+    info: () => response({ error: 0, data: { myCoin: balance } }),
+    lottery: (_url, options) => {
+      balance -= Number(new URLSearchParams(options.body).get('num')) * 10;
+      if (++batches === 1) balance += 50;
+      return response({ error: 0, data: { prizeList: [{ prizeDesc: '星光棒', prizeNum: 1 }] } });
+    }
+  });
+  await env.run();
+  const posts = env.calls.filter(call => call.options.method === 'POST');
+  assert.equal(posts.reduce((sum, call) => sum + Number(new URLSearchParams(call.options.body).get('num')), 0), 105);
+  assert.equal(env.calls.length, posts.length * 2 + 1);
+  assert.equal(balance, 0);
+  assert.match(env.statuses.at(-1), /完成 105 次.*剩余 0 金币/);
+});
+
+test("中奖后余额查询失败保留已确认结果并停止，不猜余额继续抽", async () => {
+  let reads = 0;
+  const env = setup({ info: () => ++reads === 1 ? response({ error: 0, data: { myCoin: 100 } }) : response({ error: 9, msg: '余额暂不可用' }) });
+  await env.run(); await env.run();
+  assert.equal(env.calls.filter(call => call.options.method === 'POST').length, 1);
+  assert.match(env.statuses.at(-1), /已确认完成 10 次.*余额暂不可用/);
+});
+
+test("领取返还后读取余额期间停止，不再提交下一轮", async () => {
+  let reads = 0, release;
+  const env = setup({ info: () => ++reads === 1 ? response({ error: 0, data: { myCoin: 100 } }) : new Promise(resolve => { release = resolve; }) });
+  const run = env.run();
+  while (!release) await new Promise(resolve => setImmediate(resolve));
+  env.context.anchorStarLottery.stop = true;
+  release(response({ error: 0, data: { myCoin: 50 } }));
+  await run;
+  assert.equal(env.calls.filter(call => call.options.method === 'POST').length, 1);
+  assert.match(env.statuses.at(-1), /已停止：完成 10 次.*剩余 50 金币/);
 });

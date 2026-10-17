@@ -5,7 +5,6 @@ var anchorStarLottery = { initialized: false, running: false, stop: false, needs
 function initPkg_AnchorStarLottery() {
   if (anchorStarLottery.initialized) return;
   anchorStarLottery.initialized = true;
-  ActivityHub_onStop(() => { anchorStarLottery.stop = true; });
 
   const style = document.createElement("style");
   style.textContent = `
@@ -25,7 +24,7 @@ function initPkg_AnchorStarLottery() {
   const start = document.createElement("button");
   start.type = "button";
   start.textContent = "自动抽奖";
-  start.title = "使用当前星推金币，先十连抽，再单抽；不足10金币保留";
+  start.title = "包含中奖返还的金币，先十连抽，再单抽；抽至不足10金币，可随时停止";
   const stop = document.createElement("button");
   stop.type = "button";
   stop.textContent = "停止";
@@ -139,12 +138,12 @@ function AnchorStarLottery_rewards(data) {
   return { count, complete };
 }
 
-async function AnchorStarLottery_run(view) {
+async function AnchorStarLottery_run(view, roomId = AnchorStarLottery_roomId()) {
   if (anchorStarLottery.running || anchorStarLottery.needsReload) return;
   anchorStarLottery.running = true;
   anchorStarLottery.stop = false;
   let completed = 0;
-  let total = 0;
+  let coins = null;
   let starSticks = 0;
   let rewardsComplete = true;
   const rewardSummary = () => rewardsComplete
@@ -153,29 +152,36 @@ async function AnchorStarLottery_run(view) {
   view.busy(true);
   try {
     view.status("正在读取最新金币余额…");
-    const info = await AnchorStarLottery_request("/user/lottery/info");
-    const rawCoins = info && info.myCoin;
-    const coins = typeof rawCoins === "number" || (typeof rawCoins === "string" && /^\d+$/.test(rawCoins)) ? Number(rawCoins) : NaN;
-    if (!Number.isSafeInteger(coins) || coins < 0) throw new Error("未能读取有效金币余额");
-    total = Math.floor(coins / 10);
-    if (!total) {
-      view.status("金币不足10，未执行抽奖");
+    if (!/^[1-9]\d*$/.test(String(roomId))) throw new Error("未识别到直播间");
+    const readBalance = async () => {
+      const info = await AnchorStarLottery_request("/user/lottery/info");
+      const raw = info && info.myCoin;
+      const value = typeof raw === "number" || (typeof raw === "string" && /^\d+$/.test(raw)) ? Number(raw) : NaN;
+      if (!Number.isSafeInteger(value) || value < 0) throw new Error("未能读取有效金币余额");
+      return value;
+    };
+    coins = await readBalance();
+    if (coins < 10 && !anchorStarLottery.stop) {
+      view.status(`金币不足10，未执行抽奖；余额 ${coins} 金币`);
       return;
     }
-    const roomId = AnchorStarLottery_roomId();
-    // 以开始时余额为上限，不循环消耗抽奖期间新获得的金币。
-    while (completed < total && !anchorStarLottery.stop) {
-      const num = total - completed >= 10 ? 10 : 1;
-      view.status(`抽奖中：已完成 ${completed}/${total} 次`);
+    // 每轮只依据最新服务端余额决定十连或单抽，包含本轮中奖返还的金币。
+    while (coins >= 10 && !anchorStarLottery.stop) {
+      const num = coins >= 100 ? 10 : 1;
+      view.status(`抽奖中：已完成 ${completed} 次，余额 ${coins} 金币`);
+      coins = null;
       const result = await AnchorStarLottery_request("/user/lottery/do", num, roomId);
       completed += num;
       const rewards = AnchorStarLottery_rewards(result);
       starSticks += rewards.count;
       rewardsComplete = rewardsComplete && rewards.complete;
-      view.status(`抽奖中：已完成 ${completed}/${total} 次`);
-      if (completed < total && !anchorStarLottery.stop) await sleep(500);
+      view.status(`抽奖中：已完成 ${completed} 次，${rewardSummary()}，正在确认余额…`);
+      if (anchorStarLottery.stop) break;
+      await sleep(500);
+      if (anchorStarLottery.stop) break;
+      coins = await readBalance();
     }
-    view.status(`${completed === total ? "抽奖完毕" : "已停止"}：完成 ${completed}/${total} 次，消耗 ${completed * 10} 金币，${rewardSummary()}。刷新页面查看余额和探索记录。`);
+    view.status(`${anchorStarLottery.stop ? "已停止" : "抽奖完毕"}：完成 ${completed} 次，累计消耗 ${completed * 10} 金币，${rewardSummary()}。${coins === null ? "余额请刷新查看" : `剩余 ${coins} 金币`}。`);
   } catch (error) {
     // POST 超时或断网时服务端可能已扣币，禁止自动重试或继续下一批。
     anchorStarLottery.needsReload = true;

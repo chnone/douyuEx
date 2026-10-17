@@ -1,20 +1,3 @@
-function ActivityHub_url(kind, roomId) {
-  if (!/^[1-9]\d*$/.test(String(roomId))) throw new Error("未识别到直播间，请刷新后再试");
-  const path = kind === "weekly" ? "/pages/fish-act/acc" : "/pages/new-anchor-support/";
-  const url = new URL(path, window.location.origin);
-  url.searchParams.set("rid", roomId);
-  url.searchParams.set("exActivity", kind);
-  return url.href;
-}
-
-// 仅接收同源父窗口的停止信号；打开面板和切换页签都不会启动任务。
-function ActivityHub_onStop(stop) {
-  window.addEventListener("message", event => {
-    if (window.parent !== window && event.source === window.parent &&
-        event.origin === window.location.origin && event.data?.type === "douyuex:activity-stop") stop();
-  });
-}
-
 function initPkg_ActivityHub() {
   const toolbar = document.querySelector(".ex-panel__wrap");
   if (!toolbar || document.getElementById("ex-activity-entry")) return;
@@ -32,50 +15,55 @@ function initPkg_ActivityHub() {
   panel.hidden = true;
   panel.setAttribute("role", "dialog");
   panel.setAttribute("aria-label", "活动助手");
-  panel.innerHTML = `<header><div><strong>活动助手</strong><small>手动开始 · 完成即停</small></div><button type="button" class="ex-activity-close" aria-label="关闭活动助手">×</button></header><div class="ex-activity-tabs" role="tablist" aria-label="活动"><button type="button" role="tab" data-kind="weekly" aria-selected="true">图鉴领取</button><button type="button" role="tab" data-kind="star" aria-selected="false">星推荐积分抽奖</button></div><p class="ex-activity-help"></p><div class="ex-activity-content"></div><p class="ex-activity-load" role="status"></p>`;
+  panel.innerHTML = `<header><div><strong>活动助手</strong><small>点击开始 · 再点停止</small></div><button type="button" class="ex-activity-close" aria-label="关闭活动助手">×</button></header><div class="ex-activity-actions"><div><button type="button" data-kind="weekly">图鉴领取</button><p role="status" aria-live="polite">领取我的周图鉴奖励，间隔 0.5–2 秒。</p></div><div><button type="button" data-kind="star">星推荐积分抽奖</button><p role="status" aria-live="polite">包含抽奖返还的金币，抽至不足 10 金币。</p></div></div>`;
   document.body.appendChild(panel);
-  const tabs = Array.from(panel.querySelectorAll("[role=tab]"));
-  const help = panel.querySelector(".ex-activity-help");
-  const content = panel.querySelector(".ex-activity-content");
-  const loadStatus = panel.querySelector(".ex-activity-load");
-  const frames = new Map();
-  let current = "weekly";
-  let loadTimer;
-  const stopAll = () => frames.forEach(frame => frame.contentWindow?.postMessage({ type: "douyuex:activity-stop" }, window.location.origin));
-  const select = kind => {
-    if (current !== kind) stopAll();
-    current = kind;
-    tabs.forEach(tab => tab.setAttribute("aria-selected", String(tab.dataset.kind === kind)));
-    help.textContent = kind === "weekly" ? "我的周图鉴 · 点击「领取周奖励」开始，间隔 0.5–2 秒。" : "使用星推金币 · 点击「自动抽奖」开始，可随时停止。";
-    frames.forEach((frame, key) => { frame.hidden = key !== kind; });
-    clearTimeout(loadTimer);
-    loadStatus.textContent = "";
-    if (frames.has(kind)) return;
-    let src;
-    try { src = ActivityHub_url(kind, rid); }
-    catch (error) { loadStatus.textContent = error.message; return; }
-    const frame = document.createElement("iframe");
-    frame.title = kind === "weekly" ? "我的周图鉴" : "星推荐积分抽奖";
-    frame.src = src;
-    frames.set(kind, frame);
-    content.appendChild(frame);
-    loadStatus.textContent = "正在加载活动…";
-    // 只提示一次，不轮询或自动重新加载活动。
-    loadTimer = setTimeout(() => {
-      loadStatus.textContent = "若活动未显示，请确认斗鱼已登录，然后关闭面板并刷新直播间。";
-    }, 15000);
-    frame.addEventListener("load", () => {
-      if (current === kind) { clearTimeout(loadTimer); loadStatus.textContent = ""; }
-    });
+  const buttons = Array.from(panel.querySelectorAll("[data-kind]"));
+  const stopAll = () => {
+    fishWeeklyRewards.stop = true;
+    anchorStarLottery.stop = true;
   };
+  const tasks = {
+    weekly: { state: fishWeeklyRewards, run: FishWeeklyRewards_runDirect, label: "图鉴领取" },
+    star: { state: anchorStarLottery, run: AnchorStarLottery_run, label: "星推荐积分抽奖" }
+  };
+  buttons.forEach(button => {
+    const task = tasks[button.dataset.kind];
+    const status = button.nextElementSibling;
+    const view = {
+      status(text) {
+        status.textContent = text;
+        if (/^(已领取 |领取结束|已停止|本周暂无|抽奖完毕|金币不足)/.test(text)) {
+          const safe = text.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+          showMessage(`【${task.label}】${safe}`, text.startsWith("已停止") ? "info" : "success", { timeout: 50 });
+        }
+      },
+      busy(running) {
+        buttons.forEach(other => {
+          other.disabled = (running && other !== button) || tasks[other.dataset.kind].state.needsReload;
+        });
+        button.classList.toggle("is-running", running);
+        button.textContent = running ? `停止${task.label}` : task.state.needsReload ? "刷新后重试" : task.label;
+      }
+    };
+    button.addEventListener("click", () => {
+      if (task.state.running) {
+        task.state.stop = true;
+        button.disabled = true;
+        view.status("正在停止，等待当前请求结果…");
+        return;
+      }
+      if (Object.values(tasks).some(item => item.state.running)) return;
+      task.run(view, rid);
+    });
+  });
   entry.addEventListener("click", () => {
     hideExPanel();
     panel.hidden = false;
-    select(current);
     panel.querySelector(".ex-activity-close").focus();
   });
-  const close = () => { stopAll(); panel.hidden = true; clearTimeout(loadTimer); entry.focus(); };
+  const close = () => { stopAll(); panel.hidden = true; entry.focus(); };
   panel.querySelector(".ex-activity-close").addEventListener("click", close);
   panel.addEventListener("keydown", event => { if (event.key === "Escape") close(); });
-  tabs.forEach(tab => tab.addEventListener("click", () => select(tab.dataset.kind)));
+  window.addEventListener("pagehide", stopAll);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") stopAll(); });
 }

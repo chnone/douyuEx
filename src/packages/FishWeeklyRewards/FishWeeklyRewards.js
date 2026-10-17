@@ -65,7 +65,6 @@ async function FishWeeklyRewards_run(view) {
 function initPkg_FishWeeklyRewards() {
   if (fishWeeklyRewards.initialized) return;
   fishWeeklyRewards.initialized = true;
-  ActivityHub_onStop(() => { fishWeeklyRewards.stop = true; });
   let prepareMyAlbum = new URL(window.location.href).searchParams.get("exActivity") === "weekly";
   // 使用官方独有的模块类名，布局更新时不匹配就不执行，避免点错控件。
   const root = () => document.querySelector(".wrap--z19LH");
