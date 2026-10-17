@@ -6,7 +6,7 @@
 #ex-activity-hub small { display:block; color:#8390a7; font-size:11px; }
 #ex-activity-hub button { cursor:pointer; font:inherit; }
 #ex-activity-hub .ex-activity-close { width:28px; height:28px; border:0; border-radius:8px; background:#edf1f8; color:#68768d; font-size:22px; line-height:1; }
-#ex-activity-hub .ex-activity-actions { padding:12px 16px 16px; display:grid; gap:12px; }
+#ex-activity-hub .ex-activity-actions { padding:12px 16px 16px; display:grid; gap:12px; min-height:0; overflow-y:auto; }
 #ex-activity-hub [data-kind] { width:100%; padding:12px; border:0; border-radius:10px; color:white; background:#6677df; font-weight:bold; }
 #ex-activity-hub [data-kind]:hover:not(:disabled) { background:#5365cc; }
 #ex-activity-hub [data-kind].is-running { background:#ca7651; }
