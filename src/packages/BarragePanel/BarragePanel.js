@@ -227,9 +227,21 @@ function setReplyBarrageButton(dom) {
     a.id = "barragePanel__reply";
     a.style = "z-index:5";
     dom.appendChild(a);
+    const directReply = document.createElement("div");
+    directReply.className = a.className;
+    directReply.textContent = "直接回复";
+    directReply.id = "barragePanel__directReply";
+    directReply.title = "立即发送 @昵称：原弹幕内容";
+    directReply.style = "z-index:5";
+    dom.appendChild(directReply);
 }
 
 function setBarrgePanelFunc(parentDom, id) {
+    document.getElementById("barragePanel__directReply").onclick = () => {
+        const content = document.getElementsByClassName("danmuContent-25f266")[0];
+        if (!id || !content || !content.innerText.trim()) return;
+        sendBarrage(`@${ id }：${ content.innerText }`);
+    };
     document.getElementById("barragePanel__reply").onclick = () => {
         let txt = document.getElementsByClassName("danmuContent-25f266")[0].innerText;
         const chatDom = document.getElementsByClassName("ChatSend-txt")[0];
