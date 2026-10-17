@@ -3,6 +3,7 @@ let baitId = null;
 let nextFishEndTime = 0;
 let isFishing = false;
 let timerAutoFish = 0;
+let autoFishLastOperationErrorAt = -Infinity;
 
 function initPkg_ExpandTool_AutoFish() {
   ExpandTool_AutoFish_insertDom();
@@ -90,7 +91,7 @@ function ExpandTool_AutoFish_insertFunc() {
       } else {
         const fishRes = await AutoFish_startFish();
         if (fishRes.error !== 0) {
-          showMessage(`【自动钓鱼】${fishRes.msg}`, "error");
+          AutoFish_showStartError(fishRes);
           console.log(fishRes, "钓鱼失败");
           if (fishRes.error == 1001007) {
             // 操作失败
@@ -108,6 +109,19 @@ function ExpandTool_AutoFish_insertFunc() {
       }
     }, 1500);
   });
+}
+
+function AutoFish_showStartError(fishRes) {
+  const isOperationError = fishRes.error == 1001007 || fishRes.msg === "操作失败，请刷新重试";
+  if (isOperationError) {
+    const now = Date.now();
+    if (now - autoFishLastOperationErrorAt < 60000) return;
+    autoFishLastOperationErrorAt = now;
+    // NoticeJs 的 timeout 是进度条每 1% 的间隔：15ms 约显示 1.5 秒。
+    showMessage(`【自动钓鱼】${fishRes.msg}`, "error", { timeout: 15 });
+    return;
+  }
+  showMessage(`【自动钓鱼】${fishRes.msg}`, "error");
 }
 
 async function endFish() {
