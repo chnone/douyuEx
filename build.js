@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const uglifyjs = require("uglify-js");
+const installBase = "https://raw.githubusercontent.com/chnone/douyuEx/refs/heads/feat/anchor-star-lottery/install";
 
 let css = "";
 let js = "";
@@ -89,13 +90,20 @@ function treeShake(code) {
 }
 
 function extractHeader(code) {
+  const startTag = "// ==UserScript==";
   const endTag = "// ==/UserScript==";
+  const start = code.indexOf(startTag);
   const idx = code.indexOf(endTag);
-  if (idx === -1) return { header: "", body: code };
+  if (start === -1 || idx < start) throw new Error("缺少 userscript 元数据头");
   const splitPos = idx + endTag.length;
+  const header = code.substring(start, idx)
+    .replace(/^\/\/ @(?:updateURL|downloadURL).*\r?\n/gm, "")
+    + `// @updateURL    ${installBase}/douyuex.meta.js\r\n`
+    + `// @downloadURL  ${installBase}/douyuex.user.js\r\n`
+    + endTag + "\r\n";
   return {
-    header: code.substring(0, splitPos) + "\r\n",
-    body: code.substring(splitPos),
+    header,
+    body: code.substring(0, start) + code.substring(splitPos),
   };
 }
 
@@ -113,7 +121,16 @@ function build() {
   fs.writeFileSync("./dist/douyuex.js", header + shakenBody);
 
   const result = uglifyjs.minify(shakenBody, { toplevel: true });
+  if (result.error) throw result.error;
   fs.writeFileSync("./dist/douyuex.user.js", header + result.code);
+  fs.writeFileSync("./dist/douyuex.meta.js", header);
+
+  if (process.argv.includes("--release")) {
+    fs.mkdirSync("./install", { recursive: true });
+    for (const file of ["douyuex.user.js", "douyuex.meta.js", "douyuex_version.txt"]) {
+      fs.copyFileSync(path.join("dist", file), path.join("install", file));
+    }
+  }
 }
 
 build();

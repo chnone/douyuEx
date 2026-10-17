@@ -6,53 +6,24 @@
 
 ## 安装与更新
 
-当前星推金币功能位于 [`feat/anchor-star-lottery` 分支](https://github.com/chnone/douyuEx/tree/feat/anchor-star-lottery)，脚本版本为 **2026.10.17.01**。下载源码时请选这个分支，`master` 暂未包含此功能。
+### 一键安装 / 更新
 
-本仓库暂不提供编译后的安装包，需要按下面的步骤生成脚本。插件内的旧更新入口仍指向原作者渠道，请手动更新本分支。
+**[点击安装 / 更新 DouyuEx](https://raw.githubusercontent.com/chnone/douyuEx/refs/heads/feat/anchor-star-lottery/install/douyuex.user.js)**
 
-### 1. 获取并编译脚本
+1. 在浏览器中安装并启用 Tampermonkey（油猴）。
+2. 点击上面的安装按钮，在油猴页面确认“安装”或“更新”。无需下载源码、安装 Node.js 或自行编译。
+3. 如果单独安装过“斗鱼自动抽星推金币”，在油猴管理面板中停用它，保持 DouyuEx 启用。
+4. 刷新斗鱼页面。登录后打开[全民星推荐活动页](https://www.douyu.com/pages/new-anchor-support/)，金币余额旁应出现“自动抽奖”按钮。
 
-电脑需要已安装 Node.js（带 npm）和 Git。首次获取，在终端执行：
+安装脚本包含本仓库的更新地址。后续发布更高版本后，油猴可按设置自动检查更新，也可以在油猴中手动检查更新，或再次点击上面的按钮。插件功能面板内的旧更新入口仍指向原作者渠道，请使用油猴更新。
 
-```sh
-git clone --branch feat/anchor-star-lottery https://github.com/chnone/douyuEx.git
-cd douyuEx
-npm ci
-npm test
-npm run build
-```
+### 安装按钮没有弹出油猴页面
 
-如果之前已经克隆了本仓库，且本地没有需要保留的未提交修改，在仓库目录执行：
+如果浏览器直接显示代码或下载文件，在油猴管理面板的“实用工具”中导入该文件，或将下载的脚本全文粘贴到文本导入区域，再确认安装。
 
-```sh
-git switch feat/anchor-star-lottery
-git pull --ff-only origin feat/anchor-star-lottery
-npm ci
-npm test
-npm run build
-```
+已安装相同版本或更高版本时，无需重复安装。若要给之前手动安装的同版本脚本补上更新地址，可将安装链接中的完整代码复制到油猴的原脚本编辑器中替换并保存（Windows：`Ctrl+S`；macOS：`Command+S`）。若提示重新安装会重置配置，请取消并使用此方法。
 
-构建完成后使用 `dist/douyuex.user.js`。`src/main.js` 只是源码入口，不是完整安装脚本，请勿直接导入。
-
-### 2. 在油猴中更新
-
-以下以 Edge 浏览器的 Tampermonkey（油猴）为例。先确认浏览器已安装并启用 Tampermonkey。
-
-1. 点击浏览器工具栏的油猴图标，打开“管理面板”。
-2. 已安装 DouyuEx 的用户，点击 **DouyuEx-斗鱼直播间增强插件**，进入脚本编辑器。
-3. 用文本编辑器打开刚生成的 `dist/douyuex.user.js`，复制**全部内容**；在油猴的原脚本编辑器中全选旧代码、粘贴替换，再保存（Windows：`Ctrl+S`；macOS：`Command+S`）。这是在原条目中更新代码，无需删除原脚本。
-4. 返回管理面板，确认 DouyuEx 已启用，版本显示为 **2026.10.17.01**。
-
-首次安装：在管理面板的“实用工具”中导入 `dist/douyuex.user.js`，或将脚本全文粘贴到文本导入区域，再确认安装。已有脚本的用户若遇到“重新安装并重置配置”的提示，请取消，使用上面的原脚本编辑器替换方式。
-
-### 3. 停用旧脚本并验证
-
-1. 如果单独安装过 **斗鱼自动抽星推金币**，在油猴管理面板中关闭它的开关，保持 DouyuEx 启用，避免两套逻辑同时运行。
-2. 刷新已打开的斗鱼页面。登录后打开或刷新[全民星推荐活动页](https://www.douyu.com/pages/new-anchor-support/)。
-3. 金币余额旁出现“自动抽奖”按钮，说明活动页模块已加载。**打开页面不会自动开始抽奖**；点击按钮后才会消耗活动金币。
-4. 如果按钮没有出现，先核对脚本版本和启用状态、旧脚本是否已停用，以及地址是否为上述活动页，再刷新页面。直播间页面不会显示这个按钮。
-
-后续更新本分支时，重新拉取代码、编译，并重复油猴更新和刷新步骤；版本号以当次生成脚本顶部的 `@version` 为准。
+按钮未出现时，确认 DouyuEx 已启用、独立抽奖脚本已停用，并刷新上述活动页。直播间页面不会显示抽奖按钮。
 
 ## 星推金币自动抽奖
 
@@ -66,14 +37,27 @@ npm run build
 
 打开页面不会自行抽奖。按钮仅在星推荐活动页显示。
 
-## 开发
+## 开发与发布
 
-功能模块位于 `src/packages/`，页面路由位于 `src/routers/router.js`。修改代码后执行：
+当前功能位于 `feat/anchor-star-lottery` 分支，`master` 暂未包含。开发需要 Node.js（带 npm）和 Git：
 
 ```sh
+git clone --branch feat/anchor-star-lottery https://github.com/chnone/douyuEx.git
+cd douyuEx
+npm ci
 npm test
 npm run build
 ```
+
+功能模块位于 `src/packages/`，页面路由位于 `src/routers/router.js`。本地构建输出在 `dist/`，完整安装文件为 `dist/douyuex.user.js`；`src/main.js` 只是源码入口，不能直接安装。
+
+发布更新时：
+
+1. 同步提高 `src/main.js` 的 `@version` 和 `src/packages/Update/Update.js` 的 `curVersion`。
+2. 执行 `npm test` 和 `npm run release`，生成 `install/` 中的安装脚本、更新元数据和版本文件。
+3. 将源码及 `install/` 产物一并提交并推送到 `feat/anchor-star-lottery` 分支；README 的安装按钮和油猴更新地址会指向新版本。
+
+`npm run build` 仅生成本地产物；`npm run release` 会同时刷新待发布文件，但不会自动推送。发布前请确认工作区修改已准备好发布。
 
 测试使用模拟接口，不会消耗真实金币。实际活动接口仍需在登录后的页面验证。
 

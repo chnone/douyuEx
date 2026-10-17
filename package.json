@@ -2,6 +2,7 @@
   "name": "douyuEx",
   "scripts": {
     "build": "node build.js",
+    "release": "node build.js --release",
     "test": "node --test tests/*.test.js"
   },
   "repository": {
