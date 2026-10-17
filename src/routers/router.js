@@ -4,6 +4,10 @@ function initRouter(href) {
         initPkg_AnchorStarLottery();
         return;
     }
+    if (/(^|\.)douyu\.com$/.test(pageUrl.hostname) && /^\/pages\/fish-act(?:\/|$)/.test(pageUrl.pathname)) {
+        initPkg_FishWeeklyRewards();
+        return;
+    }
     // 用于优先载入夜间模式
     // if (String(href).indexOf("www.douyu.com") && String(href).indexOf("getFansBadgeList") == -1) {
     //     initPkg_Night_Set_Fast();

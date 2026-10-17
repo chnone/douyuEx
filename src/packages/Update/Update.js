@@ -1,6 +1,6 @@
 // 版本号
 // 格式 yyyy.MM.dd.**
-var curVersion = "2026.10.17.05"
+var curVersion = "2026.10.17.06"
 var isNeedUpdate = false
 var lastestVersion = ""
 function initPkg_Update() {
