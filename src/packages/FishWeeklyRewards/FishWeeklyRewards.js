@@ -65,6 +65,8 @@ async function FishWeeklyRewards_run(view) {
 function initPkg_FishWeeklyRewards() {
   if (fishWeeklyRewards.initialized) return;
   fishWeeklyRewards.initialized = true;
+  ActivityHub_onStop(() => { fishWeeklyRewards.stop = true; });
+  let prepareMyAlbum = new URL(window.location.href).searchParams.get("exActivity") === "weekly";
   // 使用官方独有的模块类名，布局更新时不匹配就不执行，避免点错控件。
   const root = () => document.querySelector(".wrap--z19LH");
   const active = () => {
@@ -92,7 +94,7 @@ function initPkg_FishWeeklyRewards() {
   controls.append(start, stop, status);
   const style = document.createElement("style");
   style.textContent = `
-    #ex-fish-weekly-rewards { display:flex; align-items:center; gap:6px; margin:4px 10px 8px; padding:6px 8px; border:1px solid #d9f5ff; border-radius:8px; background:linear-gradient(135deg,#def6ff,#b5ddf7); color:#215880; font:12px/1.5 "Microsoft YaHei",sans-serif; }
+    #ex-fish-weekly-rewards { display:flex; flex-shrink:0; align-items:center; gap:6px; margin:4px 10px 8px; padding:6px 8px; border:1px solid #d9f5ff; border-radius:8px; background:linear-gradient(135deg,#def6ff,#b5ddf7); color:#215880; font:12px/1.5 "Microsoft YaHei",sans-serif; }
     #ex-fish-weekly-rewards.is-running { position:fixed; z-index:2147483647; left:8px; right:8px; bottom:12px; margin:0; box-shadow:0 3px 12px #143e7850; }
     #ex-fish-weekly-rewards[hidden],#ex-fish-weekly-rewards button[hidden] { display:none; }
     #ex-fish-weekly-rewards button { flex-shrink:0; padding:4px 10px; border:1px solid #fff2bc; border-radius:14px; background:linear-gradient(#fff1bf,#f7cf70); color:#82551d; box-shadow:inset 0 1px #fff; font:inherit; font-weight:bold; cursor:pointer; }
@@ -156,6 +158,11 @@ function initPkg_FishWeeklyRewards() {
     view.status("正在停止，等待当前步骤结束…");
   });
   const mount = () => {
+    // 聚合面板直接打开图鉴，仅切到「我的」页签；领奖仍由用户手动开始。
+    if (prepareMyAlbum && root()) {
+      const myTab = root().querySelector(".btns--a72T9 button:nth-child(2)");
+      if (myTab) { prepareMyAlbum = false; myTab.click(); }
+    }
     const header = root()?.querySelector(".header--DFnbh");
     if (!fishWeeklyRewards.running && header && controls.parentNode !== header.parentNode) header.after(controls);
     const visible = active();

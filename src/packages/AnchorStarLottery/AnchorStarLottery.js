@@ -5,6 +5,7 @@ var anchorStarLottery = { initialized: false, running: false, stop: false, needs
 function initPkg_AnchorStarLottery() {
   if (anchorStarLottery.initialized) return;
   anchorStarLottery.initialized = true;
+  ActivityHub_onStop(() => { anchorStarLottery.stop = true; });
 
   const style = document.createElement("style");
   style.textContent = `

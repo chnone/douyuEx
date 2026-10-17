@@ -1,0 +1,17 @@
+#ex-activity-entry { border:0; background:none; cursor:pointer; line-height:0; }
+#ex-activity-hub { position:fixed; z-index:2147483600; right:24px; bottom:24px; width:400px; max-width:calc(100vw - 24px); max-height:calc(100vh - 32px); display:flex; flex-direction:column; overflow:hidden; border:1px solid #d7e3f3; border-radius:16px; background:#f4f8ff; color:#253653; box-shadow:0 12px 48px #18264f40; font:13px/1.5 "Microsoft YaHei",sans-serif; }
+#ex-activity-hub[hidden],#ex-activity-hub iframe[hidden] { display:none; }
+#ex-activity-hub header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px 8px; background:#fff; }
+#ex-activity-hub strong { font-size:16px; }
+#ex-activity-hub small { display:block; color:#8390a7; font-size:11px; }
+#ex-activity-hub button { cursor:pointer; font:inherit; }
+#ex-activity-hub .ex-activity-close { width:28px; height:28px; border:0; border-radius:8px; background:#edf1f8; color:#68768d; font-size:22px; line-height:1; }
+#ex-activity-hub .ex-activity-tabs { display:flex; gap:6px; padding:8px 12px; background:#fff; }
+#ex-activity-hub [role=tab] { flex:1; padding:8px 4px; border:0; border-radius:9px; color:#67758f; background:#edf2fa; }
+#ex-activity-hub [role=tab][aria-selected=true] { background:#6677df; color:white; font-weight:bold; }
+#ex-activity-hub button:focus-visible { outline:2px solid #3454cb; outline-offset:2px; }
+#ex-activity-hub .ex-activity-help { margin:0; padding:7px 12px; color:#647593; font-size:11px; }
+#ex-activity-hub .ex-activity-content { min-height:0; flex:1; overflow:auto; }
+#ex-activity-hub iframe { display:block; width:100%; height:min(600px,calc(100vh - 190px)); min-height:260px; border:0; background:#e6f0ff; }
+#ex-activity-hub .ex-activity-load { margin:0; padding:0 12px; color:#6b7791; }
+#ex-activity-hub .ex-activity-load:not(:empty) { padding:8px 12px; }

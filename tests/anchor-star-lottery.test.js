@@ -194,6 +194,7 @@ test("异步挂载、幂等初始化、重建后保留控件及停止状态", as
   const env = setup();
   const dom = mockDom();
   Object.assign(env.context, dom);
+  vm.runInContext(fs.readFileSync(path.join(root, "src/packages/ActivityHub/ActivityHub.js"), "utf8"), env.context);
   env.context.initPkg_AnchorStarLottery();
   env.context.initPkg_AnchorStarLottery();
   assert.equal(dom.document.head.children.length, 1);
