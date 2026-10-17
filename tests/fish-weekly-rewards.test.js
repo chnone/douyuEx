@@ -6,7 +6,9 @@ const path = require('node:path');
 const root = path.join(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'src/packages/FishWeeklyRewards/FishWeeklyRewards.js'), 'utf8');
 function setup({ count = 3, onPause, onClaim, fail = false } = {}) {
-  const context = vm.createContext({});
+  const math = Object.create(Math);
+  math.random = () => 0;
+  const context = vm.createContext({ Math: math });
   vm.runInContext(source, context);
   const pending = Array.from({ length: count }, (_, id) => ({ id, claimed: false }));
   const statuses = [], claimed = [], opened = [];
@@ -45,7 +47,7 @@ test('没有可领取卡片时不操作', async () => {
   assert.match(env.statuses.at(-1), /暂无可领取/);
 });
 test('领取前停止不会点击领取，领取提交后停止仍统计当前成功结果', async () => {
-  for (const stopAt of [2000, 1500]) {
+  for (const stopAt of [500]) {
     const env = setup({ onPause: (ms, env) => { if (ms === stopAt) env.stop(); } });
     await env.run(); assert.equal(env.claimed.length, 0);
     assert.match(env.statuses.at(-1), /已停止：已确认领取 0 张/);
@@ -66,7 +68,7 @@ test('切换页面或隐藏页面后不再领取', async () => {
 });
 test('重复启动不会并行领取', async () => {
   let release;
-  const env = setup({ count: 1, onPause: ms => ms === 2000 ? new Promise(resolve => { release = resolve; }) : undefined });
+  const env = setup({ count: 1, onPause: ms => ms === 500 ? new Promise(resolve => { release = resolve; }) : undefined });
   const run = env.run(); await env.run(); release(); await run;
   assert.deepEqual(env.claimed, [0]);
 });
@@ -104,4 +106,16 @@ test('左下角通知仅接受同源钓鱼 iframe，奖励名称按纯文本显�
   assert.equal(messages.length, 1);
   assert.match(messages[0][0], /&lt;img/);
   assert.doesNotMatch(messages[0][0], /<img/);
+});
+
+
+test('领取步骤采用有下限的随机停顿，确认轮询不代替操作间隔', async () => {
+  const delays = [];
+  const env = setup({ count: 2, onPause: ms => delays.push(ms) });
+  env.context.Math.random = () => 0.5;
+  await env.run();
+  assert.equal(env.claimed.length, 2);
+  assert.equal(delays.length, 2);
+  const bounds = [[500, 2000], [500, 2000]];
+  delays.forEach((delay, index) => assert.ok(delay > bounds[index][0] && delay < bounds[index][1]));
 });

@@ -1,6 +1,10 @@
 // 沿用官方图鉴页面交互；不构造领奖接口，不自动钓鱼或消耗道具。
 var fishWeeklyRewards = { initialized: false, running: false, stop: false, needsReload: false };
 
+function FishWeeklyRewards_delay(min, max) {
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+
 async function FishWeeklyRewards_run(view) {
   if (fishWeeklyRewards.running || fishWeeklyRewards.needsReload) return;
   fishWeeklyRewards.running = true;
@@ -25,12 +29,11 @@ async function FishWeeklyRewards_run(view) {
       const card = view.cards()[0];
       if (!card) break;
       view.status(`准备领取第 ${completed + 1}/${total} 张，可随时停止`);
-      await view.pause(2000);
+      await view.pause(FishWeeklyRewards_delay(500, 2000));
       if (!check()) break;
       if (!view.cards().includes(card)) throw new Error("图鉴状态发生变化，请重新检查");
       view.open(card);
       const popup = await view.wait(() => view.popup(), check);
-      await view.pause(1500);
       if (!check()) break;
       const claim = view.claimButton(popup);
       if (!claim) throw new Error("未找到可领取按钮，已停止");
@@ -44,11 +47,9 @@ async function FishWeeklyRewards_run(view) {
       completed++;
       if (reward) rewards.push(reward);
       view.status(`已领取 ${completed}/${total} 张${reward ? `：${reward}` : ""}`);
-      await view.pause(1500);
       if (!check()) break;
       view.close(popup);
       await view.wait(() => !view.popup() && !view.cards().includes(card), check);
-      if (completed < total) await view.pause(3000);
     }
     view.status(`${fishWeeklyRewards.stop ? "已停止" : "领取结束"}：已确认领取 ${completed} 张${rewards.length ? `；${rewards.join("、")}` : ""}`);
   } catch (error) {
