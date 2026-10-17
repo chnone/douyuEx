@@ -126,6 +126,7 @@ function initPkg_DanmakuTail_HandleFunc(checkboxSelector, inputSelector) {
         };
 
         clickHandler = function (e) {
+            if (button.dataset.exPlainMessage === "1") return;
             const currentText = getText();
             if (currentText.trim() == "") return;
             
