@@ -22,3 +22,28 @@
     padding: 0px 10px;
     right: 20px;
 }
+
+.bag-info-summary {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-left: 12px;
+}
+
+.bag-info-actions { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.bag-info-actions .bag-button {
+    border: 0;
+    height: auto;
+    line-height: 20px;
+    font: inherit;
+    font-size: 12px;
+    padding: 2px 10px;
+    white-space: nowrap;
+    background: rgb(70, 171, 255) !important;
+    color: white !important;
+}
+.bag-info-actions .bag-button:hover { filter: brightness(1.06); }
+.bag-info-actions .bag-button:disabled { opacity: .55; cursor: default; }
