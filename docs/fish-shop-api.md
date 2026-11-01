@@ -7,7 +7,8 @@
 - 配置：<https://webconf.douyucdn.cn/resource/common/activity/actfans_w.json>
 - 配置路径：`data.fishingConfig.baitConfig.baitList`，用 `baitLv=3` 找高级鱼饵，不按礼物名称搜索。
 - 当日配置：`giftId=24942`、`giftNum=4`、`singleGiftNum=300`、`giftPrice=0.1`。礼物 ID 与名称均属于可变配置，不写死到业务逻辑。
-- 房间礼物核价：`https://gift.douyucdn.cn/api/gift/v5/web/list?rid=<room>`；`priceInfo.priceType=YUCHI`，整数 `price` 单位为 0.01 鱼翅。必须与活动配置单价一致。
+- 单礼物核价：`https://gift.douyucdn.cn/api/gift/v5/web/single?gid=<giftId>&skinId=0`，官方 `getGiftItem` 在缓存未命中后调用 `reqGiftItem` 使用该接口，不传 `rid`；响应 `data` 兼容对象或 JSON 字符串，内含 `giftList`。`priceInfo.priceType=YUCHI`，整数 `price` 单位为 0.01 鱼翅。必须与活动配置单价一致。
+- 2026.11.01.01 初版错误地要求活动礼物存在于房间 `/api/gift/v5/web/list?rid=<room>` 中。用户实测触发未找到礼物后，当日匿名复核确认：房间 3168536 的普通礼物栏返回 67 个礼物，没有 24942；单礼物接口可以查到 24942、可赠送状态 1、价格 10 YUCHI。2026.11.01.02 改为官方单礼物查询，不把普通礼物栏当完整礼物库。此查询只核实礼物信息，实际房间赠礼许可仍由赠礼接口处理。
 
 官方调用链：
 

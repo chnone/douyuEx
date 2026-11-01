@@ -1,0 +1,274 @@
+{
+  "provenance": {
+    "capturedDate": "2026-11-01",
+    "activitySource": "https://webconf.douyucdn.cn/resource/common/activity/actfans_w.json",
+    "singleSource": "https://gift.douyucdn.cn/api/gift/v5/web/single?gid=24942&skinId=0",
+    "roomListSource": "https://gift.douyucdn.cn/api/gift/v5/web/list?rid=3168536",
+    "note": "Minimal public response projection: retained all 67 room-list gift IDs to preserve absence evidence, only required fields for first listed gift and selected activity gift. No account data."
+  },
+  "config": {
+    "data": {
+      "fishingConfig": {
+        "baitConfig": {
+          "baitList": [
+            {
+              "baitLv": 1,
+              "giftId": 0,
+              "giftNum": 0,
+              "singleGiftNum": 0,
+              "giftPrice": 0
+            },
+            {
+              "baitLv": 2,
+              "giftId": 24942,
+              "giftNum": 1,
+              "singleGiftNum": 100,
+              "giftPrice": 0.1,
+              "giftName": "招募令"
+            },
+            {
+              "baitLv": 3,
+              "giftId": 24942,
+              "giftNum": 4,
+              "singleGiftNum": 300,
+              "giftPrice": 0.1,
+              "giftName": "招募令"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "single": {
+    "error": 0,
+    "data": {
+      "giftList": [
+        {
+          "id": 24942,
+          "name": "招募令",
+          "donateStatus": 1,
+          "priceInfo": {
+            "price": 10,
+            "priceType": "YUCHI",
+            "returnNum": 0
+          }
+        }
+      ]
+    }
+  },
+  "roomList": {
+    "error": 0,
+    "data": {
+      "giftList": [
+        {
+          "id": 20001,
+          "name": "弱鸡",
+          "donateStatus": 1,
+          "priceInfo": {
+            "price": 20,
+            "priceType": "YUCHI",
+            "returnNum": 0
+          }
+        },
+        {
+          "id": 24978
+        },
+        {
+          "id": 20002
+        },
+        {
+          "id": 24979
+        },
+        {
+          "id": 20006
+        },
+        {
+          "id": 20003
+        },
+        {
+          "id": 20004
+        },
+        {
+          "id": 20005
+        },
+        {
+          "id": 23335
+        },
+        {
+          "id": 24677
+        },
+        {
+          "id": 24678
+        },
+        {
+          "id": 24679
+        },
+        {
+          "id": 24656
+        },
+        {
+          "id": 24680
+        },
+        {
+          "id": 24657
+        },
+        {
+          "id": 24655
+        },
+        {
+          "id": 23669
+        },
+        {
+          "id": 24623
+        },
+        {
+          "id": 24468
+        },
+        {
+          "id": 24597
+        },
+        {
+          "id": 24560
+        },
+        {
+          "id": 24561
+        },
+        {
+          "id": 24505
+        },
+        {
+          "id": 24506
+        },
+        {
+          "id": 24507
+        },
+        {
+          "id": 20541
+        },
+        {
+          "id": 20542
+        },
+        {
+          "id": 24489
+        },
+        {
+          "id": 24490
+        },
+        {
+          "id": 24491
+        },
+        {
+          "id": 24492
+        },
+        {
+          "id": 24493
+        },
+        {
+          "id": 24496
+        },
+        {
+          "id": 24497
+        },
+        {
+          "id": 24478
+        },
+        {
+          "id": 24470
+        },
+        {
+          "id": 24472
+        },
+        {
+          "id": 24473
+        },
+        {
+          "id": 24474
+        },
+        {
+          "id": 24475
+        },
+        {
+          "id": 24621
+        },
+        {
+          "id": 23625
+        },
+        {
+          "id": 23624
+        },
+        {
+          "id": 23623
+        },
+        {
+          "id": 23622
+        },
+        {
+          "id": 20546
+        },
+        {
+          "id": 24704
+        },
+        {
+          "id": 24494
+        },
+        {
+          "id": 24705
+        },
+        {
+          "id": 24174
+        },
+        {
+          "id": 24701
+        },
+        {
+          "id": 20173
+        },
+        {
+          "id": 23510
+        },
+        {
+          "id": 24702
+        },
+        {
+          "id": 24495
+        },
+        {
+          "id": 24703
+        },
+        {
+          "id": 24503
+        },
+        {
+          "id": 24504
+        },
+        {
+          "id": 20093
+        },
+        {
+          "id": 23670
+        },
+        {
+          "id": 23338
+        },
+        {
+          "id": 23515
+        },
+        {
+          "id": 20000
+        },
+        {
+          "id": 23509
+        },
+        {
+          "id": 20008
+        },
+        {
+          "id": 20094
+        },
+        {
+          "id": 20095
+        }
+      ]
+    }
+  }
+}

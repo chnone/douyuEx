@@ -3,10 +3,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const sources = ['FishShop', 'FishBaitPurchase'].map(name => fs.readFileSync(`src/packages/FishShop/${name}.js`, 'utf8')).join('\n');
+const officialFixture = JSON.parse(fs.readFileSync('tests/fixtures/fish-bait-gift-contract.json', 'utf8'));
 const bait = { baitLv: 3, giftId: 24942, giftNum: 4, singleGiftNum: 300, giftPrice: 0.1, giftName: '旧名字' };
 const gift = { id: 24942, name: '新活动礼物', donateStatus: 1, priceInfo: { price: 10, priceType: 'YUCHI' } };
-function setup({ baitOverride = {}, giftOverride = {}, confirm = true, post, publicRead, wait } = {}) {
+function setup({ baitOverride = {}, giftOverride = {}, confirm = true, post, publicRead, wait, fixture = false, stringData = false } = {}) {
   const calls = [], publicCalls = [], states = [], busy = [], confirms = [], delays = [];
+  const unexpectedRequests = [];
   let now = Date.parse('2026-11-01T10:00:00+08:00'), uid = '99';
   const context = vm.createContext({
     URL, URLSearchParams, AbortController, setTimeout, clearTimeout,
@@ -17,17 +19,37 @@ function setup({ baitOverride = {}, giftOverride = {}, confirm = true, post, pub
     sleep: async delay => { delays.push(delay); if (wait) await wait(context); },
     GM_xmlhttpRequest(options) {
       publicCalls.push(options);
+      const url = new URL(options.url);
+      const isConfig = url.origin === 'https://webconf.douyucdn.cn' && url.pathname === '/resource/common/activity/actfans_w.json';
+      const isSingle = url.origin === 'https://gift.douyucdn.cn' && url.pathname === '/api/gift/v5/web/single';
+      const expectedKeys = isConfig ? ['_'] : ['_', 'gid', 'skinId'];
+      const valid = (isConfig || isSingle) && options.method === 'GET' && options.anonymous === true &&
+        JSON.stringify([...url.searchParams.keys()].sort()) === JSON.stringify(expectedKeys) &&
+        /^\d+$/.test(url.searchParams.get('_') || '') &&
+        (!isSingle || (/^[1-9]\d*$/.test(url.searchParams.get('gid') || '') && url.searchParams.get('skinId') === '0'));
+      if (!valid) {
+        unexpectedRequests.push(options.url);
+        throw new Error(`测试拒绝未核实的公开接口：${options.url}`);
+      }
       if (publicRead && publicRead(options, context, publicCalls.length) === false) return;
-      const data = options.url.includes('webconf.')
-        ? { data: { fishingConfig: { baitConfig: { baitList: [ { ...bait, ...baitOverride } ] } } } }
-        : { error: 0, data: JSON.stringify({ giftList: [ { ...gift, ...giftOverride } ] }) };
-      options.onload({ status: 200, responseText: options.url.includes('webconf.') ? `DYConfigCallback(${JSON.stringify(data)});` : JSON.stringify(data) });
+      let data;
+      if (isConfig) {
+        data = fixture ? structuredClone(officialFixture.config) : { data: { fishingConfig: { baitConfig: { baitList: [{ ...bait, ...baitOverride }] } } } };
+      } else {
+        const selected = fixture ? structuredClone(officialFixture.single.data.giftList[0]) : { ...gift, ...giftOverride };
+        const detail = { giftList: String(selected.id) === url.searchParams.get('gid') ? [selected] : [] };
+        data = { error: 0, data: stringData ? JSON.stringify(detail) : detail };
+      }
+      options.onload({ status: 200, responseText: isConfig ? `DYConfigCallback(${JSON.stringify(data)});` : JSON.stringify(data) });
     },
     fetch: async (url, options) => { calls.push({ url, options }); return post ? post(url, options, context) : { ok: true, json: async () => ({ error: 0, data: {} }) }; }
   });
   vm.runInContext(sources, context);
   const view = { status: value => states.push(value), busy: value => busy.push(value) };
-  return { context, calls, publicCalls, states, busy, confirms, delays, setUid: value => { uid = value; }, tick: (ms = 3000) => { now += ms; }, run: (room = '123') => context.FishBaitPurchase_run(view, room) };
+  return { context, calls, publicCalls, states, busy, confirms, delays, unexpectedRequests, setUid: value => { uid = value; }, tick: (ms = 3000) => { now += ms; }, async run(room = '123') {
+    await context.FishBaitPurchase_run(view, room);
+    assert.deepEqual(unexpectedRequests, [], '公开查询必须使用已核实的接口和参数，不能由泛化mock掩盖错误路由');
+  } };
 }
 
 test('动态按高级等级匹配礼物，三笔各4个并携带高级鱼饵业务字段', async () => {
@@ -35,6 +57,13 @@ test('动态按高级等级匹配礼物，三笔各4个并携带高级鱼饵业�
   assert.equal(e.calls.length, 3);
   assert.equal(e.publicCalls.length, 8);
   assert.ok(e.publicCalls.every(c => c.anonymous && c.method === 'GET'));
+  for (const call of e.publicCalls.filter(call => new URL(call.url).hostname === 'gift.douyucdn.cn')) {
+    const url = new URL(call.url);
+    assert.equal(url.pathname, '/api/gift/v5/web/single');
+    assert.equal(url.searchParams.get('gid'), '24942');
+    assert.equal(url.searchParams.get('skinId'), '0');
+    assert.equal(url.searchParams.has('rid'), false);
+  }
   assert.equal(e.confirms.length, 1);
   assert.match(e.confirms[0], /新活动礼物.*4 × 3 = 12/);
   assert.match(e.confirms[0], /900.*\n合计 1.2 鱼翅/);
@@ -58,6 +87,7 @@ test('礼物ID、名称换期自动适配，不查招募令文本', async () => 
   assert.equal(e.calls.length, 3);
   assert.match(e.confirms[0], /冬日限定/);
   assert.equal(new URLSearchParams(e.calls[0].options.body).get('giftId'), '88888');
+  assert.ok(e.publicCalls.filter(call => new URL(call.url).hostname === 'gift.douyucdn.cn').every(call => new URL(call.url).searchParams.get('gid') === '88888'));
 });
 
 for (const [name, options] of [
@@ -163,4 +193,66 @@ test('礼物列表重复ID不扣费', async () => {
   const e = setup({ publicRead(options, _context, count) {
     if (count === 2) { options.onload({ status: 200, responseText: JSON.stringify({ error: 0, data: { giftList: [gift, gift] } }) }); return false; }
   } }); await e.run(); assert.equal(e.calls.length, 0); assert.equal(e.confirms.length, 0);
+});
+
+for (const stringData of [false, true]) test(`真实公开配置回归：普通礼物栏没有鱼饵礼物，single详情${stringData ? '字符串' : '对象'}仍可核价`, async () => {
+  const target = officialFixture.config.data.fishingConfig.baitConfig.baitList.find(item => item.baitLv === 3).giftId;
+  assert.equal(officialFixture.roomList.data.giftList.length, 67);
+  assert.ok(!officialFixture.roomList.data.giftList.some(item => item.id === target));
+  assert.equal(officialFixture.single.data.giftList[0].id, target);
+  const e = setup({ fixture: true, stringData });
+  await e.run();
+  assert.equal(e.calls.length, 3);
+  assert.equal(e.confirms.length, 1);
+  assert.match(e.confirms[0], /招募令.*12 个/);
+  assert.ok(e.publicCalls.every(call => !new URL(call.url).pathname.endsWith('/list')));
+  assert.equal(e.context.fishBaitPurchase.needsReload, false);
+});
+
+for (const [name, payload] of [
+  ['详情找不到该礼物', { error: 0, data: { giftList: [] } }],
+  ['详情返回其他ID', { error: 0, data: { giftList: [{ ...gift, id: 88888 }] } }],
+  ['详情返回重复目标', { error: 0, data: { giftList: [gift, gift] } }],
+  ['详情缺少列表', { error: 0, data: {} }],
+  ['详情列表不是数组', { error: 0, data: { giftList: { gift } } }],
+  ['详情缺少成功状态', { data: { giftList: [gift] } }],
+  ['详情业务错误', { error: 5, msg: 'not found', data: { giftList: [gift] } }],
+  ['详情嵌套JSON无效', { error: 0, data: 'not json' }],
+  ['详情现价为空', { error: 0, data: { giftList: [{ ...gift, priceInfo: { price: null, priceType: 'YUCHI' } }] } }],
+  ['详情现价为零', { error: 0, data: { giftList: [{ ...gift, priceInfo: { price: 0, priceType: 'YUCHI' } }] } }]
+]) test(`${name}不确认、不扣费且不锁死未提交操作`, async () => {
+  const e = setup({ publicRead(options) {
+    if (new URL(options.url).pathname.endsWith('/single')) {
+      options.onload({ status: 200, responseText: JSON.stringify(payload) });
+      return false;
+    }
+  } });
+  await e.run();
+  assert.equal(e.calls.length, 0); assert.equal(e.confirms.length, 0);
+  assert.equal(e.context.fishBaitPurchase.needsReload, false);
+  assert.match(e.states.at(-1), /已停止.*未继续扣费/);
+});
+
+test('详情HTTP错误不回退到普通赠礼或跳过核价', async () => {
+  const e = setup({ publicRead(options) {
+    if (new URL(options.url).pathname.endsWith('/single')) {
+      options.onload({ status: 503, responseText: '{}' }); return false;
+    }
+  } });
+  await e.run(); assert.equal(e.calls.length, 0); assert.equal(e.confirms.length, 0);
+  assert.equal(e.publicCalls.length, 2); assert.equal(e.context.fishBaitPurchase.needsReload, false);
+});
+
+test('测试替身拒绝未知接口或错误查询参数，不再将任意GET伪装为有效礼物', () => {
+  const e = setup();
+  for (const url of [
+    'https://gift.douyucdn.cn/api/gift/v5/web/list?rid=123&_=1',
+    'https://gift.douyucdn.cn/api/gift/v5/web/single?gid=24942&skinId=0&rid=123&_=1',
+    'https://gift.douyucdn.cn/api/gift/v5/web/single?giftId=24942&skinId=0&_=1',
+    'https://gift.douyucdn.cn/api/gift/v5/web/single?gid=24942&skinId=1&_=1',
+    'https://example.com/api/gift/v5/web/single?gid=24942&skinId=0&_=1'
+  ]) {
+    assert.throws(() => e.context.GM_xmlhttpRequest({ method: 'GET', anonymous: true, url }), /未核实的公开接口/);
+  }
+  assert.equal(e.calls.length, 0);
 });

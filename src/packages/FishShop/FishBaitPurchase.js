@@ -21,12 +21,13 @@ function FishBaitPurchase_config(config) {
 
 async function FishBaitPurchase_quote(roomId) {
   const bait = FishBaitPurchase_config(await FishShop_config());
-  const payload = await FishShop_publicJson(`https://gift.douyucdn.cn/api/gift/v5/web/list?rid=${encodeURIComponent(roomId)}&_=${Date.now()}`);
-  if (!payload || (payload.error !== 0 && payload.error !== "0")) throw new Error("礼物列表未返回成功状态");
+  // 官方 getGiftItem 在礼物栏未命中时按 ID 查询 single；活动礼物不一定展示在普通礼物栏。
+  const payload = await FishShop_publicJson(`https://gift.douyucdn.cn/api/gift/v5/web/single?gid=${bait.giftId}&skinId=0&_=${Date.now()}`);
+  if (!payload || (payload.error !== 0 && payload.error !== "0")) throw new Error("礼物详情未返回成功状态");
   const data = typeof payload.data === "string" ? JSON.parse(payload.data) : payload.data;
-  if (!Array.isArray(data?.giftList)) throw new Error("礼物列表格式异常");
+  if (!Array.isArray(data?.giftList)) throw new Error("礼物详情格式异常");
   const matches = data.giftList.filter(item => Number(item?.id) === bait.giftId);
-  if (matches.length !== 1) throw new Error("当前房间未找到鱼饵对应礼物");
+  if (matches.length !== 1) throw new Error("未能唯一确认鱼饵对应礼物详情");
   const gift = matches[0];
   if (Number(gift.donateStatus) !== 1 || gift.priceInfo?.priceType !== "YUCHI") throw new Error("鱼饵礼物不可赠送或不是鱼翅价格");
   if (FishShop_count(gift.priceInfo.price, "礼物价格") !== bait.price) throw new Error("活动配置与礼物价格不一致");
