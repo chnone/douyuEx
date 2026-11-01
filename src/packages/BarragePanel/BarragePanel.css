@@ -19,9 +19,25 @@
     pointer-events: auto !important;
 }
 
-.thirdBtn-06cde5, .fourBtn-0845d4 {
-    /* 加宽按钮方便点击 */
-    margin-left: 0px !important;
-    margin-right: 0px !important;
-    padding: 0 17px !important;
+#comment-dzjy-container .ex-barrage-tip-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+#comment-dzjy-container .ex-barrage-tip-actions > .labelfisrt-407af4 {
+    flex: 0 0 auto;
+    width: auto !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 0 5px !important;
+    white-space: nowrap;
+}
+
+#comment-dzjy-container .ex-barrage-tip-actions > .sugun-e3fbf6 {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
 }

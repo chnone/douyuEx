@@ -16,34 +16,38 @@ function setBarragePanelTipCallBack() {
 }
 
 function renderBarragePanelTip() {
-    const labelDoms = document.getElementsByClassName("labelfisrt-407af4");
+    const container = document.getElementById("comment-dzjy-container");
+    if (!container) return;
+    const labelDoms = container.getElementsByClassName("labelfisrt-407af4");
     if (labelDoms.length === 0) return;
     const dom = labelDoms[0].parentElement;
-    if (dom.querySelector("[id='barrage-panel-tip__+1']")) return;
-    let a = document.createElement("p");
-    a.className = "sugun-e3fbf6";
-    a.innerText = "|";
-    dom.appendChild(a);
-
-    a = document.createElement("div");
-    a.className = "labelfisrt-407af4 thirdBtn-06cde5 fourBtn-0845d4";
-    a.id = "barrage-panel-tip__+1"
-    a.innerText = "+1";
-    dom.appendChild(a);
-
-    const reply = Array.from(dom.querySelectorAll("div, button, a"))
-        .find(button => button.textContent.trim() === "回复");
+    const reply = Array.from(dom.children)
+        .find(button => button.matches("div, button, a") && button.textContent.trim() === "回复");
+    dom.classList.add("ex-barrage-tip-actions");
+    let plusOne = dom.querySelector("[id='barrage-panel-tip__+1']");
+    if (!plusOne) {
+        plusOne = document.createElement("div");
+        plusOne.className = "labelfisrt-407af4 thirdBtn-06cde5 fourBtn-0845d4";
+        plusOne.id = "barrage-panel-tip__+1";
+        plusOne.textContent = "+1";
+        dom.insertBefore(plusOne, reply || null);
+    }
     if (!reply) return;
-    const directReply = document.createElement("div");
-    directReply.className = a.className;
-    directReply.id = "barrage-panel-tip__direct-reply";
-    directReply.textContent = "直接回复";
-    directReply.title = "立即发送 @昵称：原弹幕内容";
+    let directReply = dom.querySelector("[id='barrage-panel-tip__direct-reply']");
+    if (!directReply) {
+        directReply = document.createElement("div");
+        directReply.className = plusOne.className;
+        directReply.id = "barrage-panel-tip__direct-reply";
+        directReply.textContent = "直接回复";
+        directReply.title = "立即发送 @昵称：原弹幕内容";
+    }
+    // 只移动插件按钮，不重建原生按钮，保留赞、举报、回复和收藏的事件。
+    if (plusOne.nextElementSibling !== reply) dom.insertBefore(plusOne, reply);
+    if (directReply.nextElementSibling !== plusOne) dom.insertBefore(directReply, plusOne);
     directReply.onclick = event => {
         event.stopPropagation();
         BarragePanelTip_directReply(reply);
     };
-    dom.insertBefore(directReply, a);
 }
 
 function setBarragePanelTipFunc() {
