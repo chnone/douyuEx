@@ -19,7 +19,7 @@ function initPkg_ActivityHub() {
     <div><button type="button" data-kind="weekly">图鉴领取</button><p role="status" aria-live="polite">领取我的周图鉴奖励，间隔 0.5–2 秒。</p></div>
     <div><button type="button" data-kind="star">星推荐积分抽奖</button><p role="status" aria-live="polite">包含抽奖返还的金币，抽至不足 10 金币。</p></div>
     <div><button type="button" data-kind="fishRole">鱼娘自动召唤</button><p role="status" aria-live="polite">使用现有机会，包含重复形象返还次数，抽完即停。</p></div>
-    <div><button type="button" data-kind="fishBait">高级鱼饵 ×3组</button><p role="status" aria-live="polite">3 × 300 = 900 个鱼饵，当前活动礼物 ×4 ×3，共 12 个。消耗鱼翅，核价确认后购买，不自动充值。</p></div>
+    <div><button type="button" data-kind="fishBait">高级鱼饵 ×3组</button><p role="status" aria-live="polite">点击直接购买 900 个鱼饵，赠送当期礼物 ×4 ×3，共 12 个，消耗鱼翅。不再弹确认框，仍先核价，不自动充值。</p></div>
     <div><button type="button" data-kind="fishStamp">积分全换陪伴印章</button><p role="status" aria-live="polite">只用鱼塘积分兑换陪伴印章，先买贵的，按每日限购次数依次购买。</p></div>
     <div><button type="button" data-kind="guard">赠送全力守护 ×1</button><p role="status" aria-live="polite">当前房间 · 付费礼物 · 单次上限 1 元，赠送前核价。</p></div>
   </div>`;

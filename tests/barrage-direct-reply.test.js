@@ -100,14 +100,19 @@ test('聊天区菜单只添加一个入口；切换弹幕后发送新作者及�
   assert.deepEqual(s.sent, ['@乙：另一条内容']);
 });
 
-function setupTipBar({ hasReply = true, hasContainer = true } = {}) {
+function setupTipBar({ hasReply = true, hasContainer = true, extra = [] } = {}) {
   let mutations = 0;
   const sent = [], nativeClicks = [];
   class Element {
     constructor(tag = 'div', text = '') {
       this.tag = tag; this.textContent = text; this.children = []; this.className = '';
-      this.classList = { add: name => { if (!this.className.split(' ').includes(name)) this.className += ` ${name}`; } };
+      this.classList = {
+        add: name => { if (!this.className.split(' ').includes(name)) this.className += ` ${name}`; },
+        contains: name => this.className.split(' ').includes(name)
+      };
     }
+    get firstChild() { return this.children[0] || null; }
+    get firstElementChild() { return this.firstChild; }
     get nextElementSibling() {
       if (!this.parentElement) return null;
       return this.parentElement.children[this.parentElement.children.indexOf(this) + 1] || null;
@@ -120,23 +125,28 @@ function setupTipBar({ hasReply = true, hasContainer = true } = {}) {
     }
     appendChild(node) { this.insertBefore(node, null); }
     matches(selector) { return selector.split(',').map(item => item.trim()).includes(this.tag); }
+    getAttribute(name) { return this[name] ?? null; }
+    closest() { return null; }
     getElementsByClassName(name) {
       return this.children.flatMap(child => [...(child.className.split(' ').includes(name) ? [child] : []), ...child.getElementsByClassName(name)]);
     }
     querySelector(selector) {
-      const id = selector.match(/\[id='([^']+)'\]/)?.[1];
-      for (const child of this.children) {
-        if (child.id === id) return child;
-        const nested = child.querySelector(selector);
-        if (nested) return nested;
-      }
-      return null;
+      return this.querySelectorAll(selector)[0] || null;
     }
-    click() { this.onclick?.({ stopPropagation() {} }); }
+    querySelectorAll(selector) {
+      const id = selector.match(/\[id='([^']+)'\]/)?.[1];
+      const found = [];
+      for (const child of this.children) {
+        if (child.id === id) found.push(child);
+        found.push(...child.querySelectorAll(selector));
+      }
+      return found;
+    }
+    click() { if (!this.disabled) this.onclick?.({ stopPropagation() {} }); }
   }
   const container = new Element(), bar = new Element(), native = {};
   container.appendChild(bar);
-  for (const name of ['赞', '举报', ...(hasReply ? ['回复'] : []), '收藏']) {
+  for (const name of ['赞', '举报', ...(hasReply ? ['回复'] : []), '收藏', ...extra]) {
     const button = new Element('div', name);
     button.className = 'labelfisrt-407af4'; button.onclick = () => nativeClicks.push(name);
     native[name] = button; bar.appendChild(button);
@@ -164,11 +174,11 @@ function setupTipBar({ hasReply = true, hasContainer = true } = {}) {
   };
 }
 
-test('播放器操作栏将直接回复和+1放在中间，保留四个原生按钮及分隔线', () => {
+test('播放器操作栏首行固定直接回复和+1，原生按钮保留原节点和相对顺序', () => {
   const env = setupTipBar();
   const original = Object.values(env.native), separator = env.bar.children[1];
   env.render();
-  assert.deepEqual(env.actions(), ['赞', '举报', '直接回复', '+1', '回复', '收藏']);
+  assert.deepEqual(env.actions(), ['直接回复', '+1', '赞', '举报', '回复', '收藏']);
   assert.ok(env.bar.className.includes('ex-barrage-tip-actions'));
   assert.equal(env.bar.children.filter(node => node.tag === 'p').length, 1);
   assert.ok(env.bar.children.includes(separator));
@@ -201,24 +211,90 @@ test('直接回复保持绑定当前原生回复，宿主替换回复节点后�
   env.bar.children.splice(env.bar.children.indexOf(old), 1); old.parentElement = null;
   env.render(); direct.click();
   assert.equal(selected[1], replacement);
-  assert.deepEqual(env.actions(), ['赞', '举报', '直接回复', '+1', '回复', '收藏']);
+  assert.deepEqual(env.actions(), ['直接回复', '+1', '赞', '举报', '回复', '收藏']);
   assert.deepEqual(env.sent, []);
 });
 
-test('宿主尚未出现回复按钮时不猜测目标，出现后补入中间且无重复', () => {
+test('没有原生回复时首行仍固定，直接回复禁用；出现后恢复且无重复', () => {
   const env = setupTipBar({ hasReply: false }); env.render();
-  assert.deepEqual(env.actions(), ['赞', '举报', '收藏', '+1']);
+  assert.deepEqual(env.actions(), ['直接回复', '+1', '赞', '举报', '收藏']);
+  const direct = env.bar.querySelector("[id='barrage-panel-tip__direct-reply']");
+  assert.equal(direct.disabled, true); direct.click(); assert.deepEqual(env.sent, []);
   const reply = new env.Element('a', '回复'); reply.className = 'labelfisrt-407af4';
   env.bar.insertBefore(reply, env.native['收藏']); env.render();
-  assert.deepEqual(env.actions(), ['赞', '举报', '直接回复', '+1', '回复', '收藏']);
+  assert.deepEqual(env.actions(), ['直接回复', '+1', '赞', '举报', '回复', '收藏']);
+  assert.equal(direct.disabled, false);
   const absent = setupTipBar({ hasContainer: false }); absent.context.renderBarragePanelTip();
   assert.deepEqual(absent.actions(), ['赞', '举报', '回复', '收藏']);
 });
 
-test('紧凑样式仅作用于播放器操作栏，不再全局加宽宿主按钮', () => {
+test('不同房间的额外功能全部保留，原生回复禁用时不能绕过', () => {
+  const env = setupTipBar({ extra: ['加一', '徽章', '其他功能', '房管'] });
+  env.native['回复'].className += ' labelfisrtDisabled-8f6f35';
+  env.render();
+  assert.deepEqual(env.actions(), ['直接回复', '+1', '赞', '举报', '回复', '收藏', '加一', '徽章', '其他功能', '房管']);
+  assert.equal(env.bar.querySelector("[id='barrage-panel-tip__direct-reply']").disabled, true);
+  for (const name of ['加一', '徽章', '其他功能', '房管']) env.native[name].click();
+  assert.deepEqual(env.nativeClicks, ['加一', '徽章', '其他功能', '房管']);
+});
+
+test('固定两列和泡泡尺寸样式仅作用于播放器操作栏，不再按剩余宽度随机换行', () => {
   const css = source('BarragePanel.css');
-  assert.match(css, /#comment-dzjy-container \.ex-barrage-tip-actions\s*\{[^}]*gap:\s*4px/s);
-  assert.match(css, /#comment-dzjy-container \.ex-barrage-tip-actions > \.labelfisrt-407af4\s*\{[^}]*padding:\s*0 5px !important/s);
+  assert.match(css, /#comment-dzjy-container \.ex-barrage-tip-actions\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(0, 1fr\)\)/s);
+  assert.match(css, /#comment-dzjy-container \.ex-barrage-tip-popup\s*\{[^}]*width:\s*188px !important/s);
+  assert.match(css, /\.ex-barrage-tip-actions > \.sugun-e3fbf6\s*\{\s*display:\s*none/s);
+  assert.ok(!css.includes('flex-wrap: wrap'));
   assert.ok(!css.includes('padding: 0 17px'));
   assert.ok(!/^\.thirdBtn-06cde5/m.test(css));
+});
+
+test('外层泡泡按播放器与真实裁剪祖先交集钳位，忽略零高挂载点并保持宿主定位', () => {
+  const env = setupTipBar();
+  const makeStyle = () => {
+    const values = new Map();
+    return { left: '90px', getPropertyValue: name => values.get(name) || '', setProperty: (name, value) => values.set(name, value) };
+  };
+  const ancestor = (id, rect, parentElement, overflow = 'visible') => ({ id, parentElement, classList: { contains: () => false }, overflow,
+    getBoundingClientRect: () => ({ ...rect, width: rect.right - rect.left, height: rect.bottom - rect.top }) });
+  const clip = ancestor('', { left: 90, top: 40, right: 440, bottom: 310 }, null, 'hidden');
+  const player = ancestor('__h5player', { left: 100, top: 50, right: 500, bottom: 350 }, clip);
+  const mount = ancestor('comment-dzjy-container', { left: 100, top: 50, right: 124, bottom: 50 }, player);
+  const arrow = { style: makeStyle() };
+  let nativeLeft = 420, nativeTop = 290;
+  const popup = {
+    isConnected: true, parentElement: mount, offsetWidth: 188, offsetHeight: 108, style: makeStyle(),
+    querySelector: () => arrow,
+    getBoundingClientRect() {
+      const [x = 0, y = 0] = this.style.getPropertyValue('translate').split(' ').map(parseFloat);
+      const left = nativeLeft + (x || 0), top = nativeTop + (y || 0);
+      return { left, top, right: left + 188, bottom: top + 108, width: 188, height: 108 };
+    }
+  };
+  env.context.window = {};
+  env.context.document.documentElement = { clientWidth: 800, clientHeight: 600 };
+  env.context.getComputedStyle = element => ({ overflowX: element.overflow, overflowY: element.overflow });
+  const targets = env.context.BarragePanelTip_clamp(popup);
+  assert.deepEqual({ ...popup.getBoundingClientRect() }, { left: 244, top: 194, right: 432, bottom: 302, width: 188, height: 108 });
+  assert.ok(targets.includes(player)); assert.ok(targets.includes(clip)); assert.ok(!targets.includes(mount));
+  assert.equal(popup.style.left, '90px', '不能覆盖宿主设置的定位值');
+  const translate = popup.style.getPropertyValue('translate');
+  env.context.BarragePanelTip_clamp(popup);
+  assert.equal(popup.style.getPropertyValue('translate'), translate, '重复钳位不能累计漂移');
+  assert.equal(arrow.style.left, '90px', '原生箭头锚点不能被覆盖');
+  assert.equal(arrow.style.getPropertyValue('--ex-barrage-tip-arrow-left'), '174px');
+  nativeLeft = 20; nativeTop = 10;
+  env.context.BarragePanelTip_clamp(popup);
+  assert.equal(popup.getBoundingClientRect().left, 108); assert.equal(popup.getBoundingClientRect().top, 58);
+  assert.equal(arrow.style.getPropertyValue('--ex-barrage-tip-arrow-left'), '14px');
+  player.getBoundingClientRect = () => ({ left: 100, top: -400, right: 500, bottom: -100, width: 400, height: 300 });
+  assert.ok(env.context.BarragePanelTip_clamp(popup).includes(player));
+  assert.equal(popup.style.getPropertyValue('visibility'), 'hidden');
+  assert.notEqual(popup.style.getPropertyValue('--ex-barrage-tip-max-height'), '0px');
+  player.getBoundingClientRect = () => ({ left: 100, top: 50, right: 500, bottom: 350, width: 400, height: 300 });
+  env.context.BarragePanelTip_clamp(popup);
+  assert.equal(popup.style.getPropertyValue('visibility'), '');
+  popup.offsetWidth = 0; popup.offsetHeight = 0;
+  popup.style.setProperty('--ex-barrage-tip-max-width', '0px');
+  env.context.BarragePanelTip_clamp(popup);
+  assert.equal(popup.style.getPropertyValue('--ex-barrage-tip-max-width'), '324px', '零尺寸恢复前先刷新约束，不早退锁死');
 });

@@ -86,7 +86,7 @@ test('活动助手新增两个入口，初始化和打开均不会自动执行�
   const env = setupHub();
   assert.deepEqual(env.panel.buttons.map(button => button.dataset.kind), taskDefinitions.map(item => item[0]));
   assert.equal(env.panel.hidden, true);
-  assert.match(env.button('fishBait').nextElementSibling.textContent, /900.*12.*鱼翅.*确认.*不自动充值/);
+  assert.match(env.button('fishBait').nextElementSibling.textContent, /点击直接购买.*900.*12.*鱼翅.*不再弹确认框.*核价.*不自动充值/);
   assert.match(env.button('fishStamp').nextElementSibling.textContent, /只用鱼塘积分.*陪伴印章.*先买贵的.*每日限购/);
   env.context.initPkg_ActivityHub();
   assert.equal(env.toolbar.children.length, 1); assert.equal(env.document.body.children.length, 1);

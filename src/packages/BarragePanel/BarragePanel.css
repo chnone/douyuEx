@@ -19,25 +19,88 @@
     pointer-events: auto !important;
 }
 
-#comment-dzjy-container .ex-barrage-tip-actions {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 4px;
+#comment-dzjy-container .ex-barrage-tip-popup {
+    box-sizing: border-box;
+    width: 188px !important;
+    max-width: var(--ex-barrage-tip-max-width, calc(100vw - 16px)) !important;
+    height: auto !important;
+    max-height: var(--ex-barrage-tip-max-height, calc(100vh - 16px));
+    min-width: 0;
+    border-radius: 12px;
+    white-space: normal;
 }
 
-#comment-dzjy-container .ex-barrage-tip-actions > .labelfisrt-407af4 {
-    flex: 0 0 auto;
-    width: auto !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    padding: 0 5px !important;
-    white-space: nowrap;
+#comment-dzjy-container .ex-barrage-tip-actions {
+    box-sizing: border-box;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: row;
+    grid-auto-rows: max-content;
+    align-items: stretch;
+    gap: 4px 6px;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    padding: 8px;
+    overflow-y: auto;
+}
+
+#comment-dzjy-container .ex-barrage-tip-actions > :not(.sugun-e3fbf6) {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100% !important;
+    height: auto;
+    min-height: 28px;
+    margin: 0 !important;
+    padding: 3px 4px !important;
+    justify-content: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+#comment-dzjy-container .ex-barrage-tip-actions .danmuMenuButtonLabel-9d78f6 {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+#comment-dzjy-container .ex-barrage-tip-actions .danmuMenuButtonContent-d2e371 {
+    min-width: 0;
+    height: auto;
+    min-height: 20px;
+}
+
+#comment-dzjy-container .ex-barrage-tip-actions > button {
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    font: inherit;
+    color: #fff;
+    cursor: pointer;
+}
+
+#comment-dzjy-container .ex-barrage-tip-actions > button:disabled {
+    color: #999;
+    cursor: default;
+}
+
+#comment-dzjy-container .ex-barrage-tip-actions > button:focus-visible {
+    outline: 1px solid #fff;
+    outline-offset: -1px;
 }
 
 #comment-dzjy-container .ex-barrage-tip-actions > .sugun-e3fbf6 {
-    flex: 0 0 auto;
-    margin: 0;
-    padding: 0;
+    display: none;
+}
+
+#comment-dzjy-container .ex-barrage-tip-popup > .btnscontainerrect-6e7730,
+#comment-dzjy-container .ex-barrage-tip-popup > .btnscontainerrectup-8c6ff2 {
+    left: var(--ex-barrage-tip-arrow-left, 50%) !important;
+}
+
+#comment-dzjy-container .ex-barrage-tip-popup > .AIContainer-54a20d {
+    min-width: 0;
+    flex-shrink: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }

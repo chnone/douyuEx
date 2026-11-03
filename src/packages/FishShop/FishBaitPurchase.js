@@ -19,10 +19,20 @@ function FishBaitPurchase_config(config) {
   return { giftId, price: rounded };
 }
 
-async function FishBaitPurchase_quote(roomId) {
-  const bait = FishBaitPurchase_config(await FishShop_config());
+async function FishBaitPurchase_quote(roomId, previousQuote) {
   // 官方 getGiftItem 在礼物栏未命中时按 ID 查询 single；活动礼物不一定展示在普通礼物栏。
-  const payload = await FishShop_publicJson(`https://gift.douyucdn.cn/api/gift/v5/web/single?gid=${bait.giftId}&skinId=0&_=${Date.now()}`);
+  const readGift = giftId => FishShop_publicJson(`https://gift.douyucdn.cn/api/gift/v5/web/single?gid=${giftId}&skinId=0&_=${Date.now()}`);
+  let bait, payload;
+  if (previousQuote) {
+    // 已知上一组礼物 ID 后并行重读配置与价格；换期则停止，不能使用旧 ID 扣费。
+    const results = await Promise.all([FishShop_config(), readGift(previousQuote.giftId)]);
+    bait = FishBaitPurchase_config(results[0]);
+    if (bait.giftId !== previousQuote.giftId) throw new Error("鱼饵礼物已变化，请重新核对");
+    payload = results[1];
+  } else {
+    bait = FishBaitPurchase_config(await FishShop_config());
+    payload = await readGift(bait.giftId);
+  }
   if (!payload || (payload.error !== 0 && payload.error !== "0")) throw new Error("礼物详情未返回成功状态");
   const data = typeof payload.data === "string" ? JSON.parse(payload.data) : payload.data;
   if (!Array.isArray(data?.giftList)) throw new Error("礼物详情格式异常");
@@ -63,14 +73,10 @@ async function FishBaitPurchase_run(view, roomId) {
     view.status("正在读取当期高级鱼饵礼物并核价…");
     const quote = await FishBaitPurchase_quote(roomId);
     if (!check()) { view.status("已停止：尚未购买鱼饵"); return; }
-    if (!window.confirm(`向当前房间 ${roomId} 赠送「${quote.name}」4 × 3 = 12 个，兑换 3 组高级鱼饵（共 900 个）。\n合计 ${quote.price * 12 / 100} 鱼翅，使用现有余额，不自动充值。\n确认购买？`)) {
-      view.status("已停止：已取消，未购买鱼饵");
-      return;
-    }
     for (let group = 0; group < 3; group++) {
       if (!check()) break;
-      // 确认后、每笔扣费前重新核对活动与价格，配置变化时不沿用旧礼物。
-      const latest = await FishBaitPurchase_quote(roomId);
+      // 点击即购买：首笔直接使用刚核实的报价，后续每笔仍重新核对。
+      const latest = group === 0 ? quote : await FishBaitPurchase_quote(roomId, quote);
       if (!check()) break;
       if (latest.giftId !== quote.giftId || latest.price !== quote.price || latest.name !== quote.name) throw new Error("鱼饵礼物或价格已变化，请重新核对");
       view.status(`正在兑换第 ${group + 1}/3 组：${quote.name} ×4（${quote.price * 4 / 100} 鱼翅）…`);
@@ -79,7 +85,7 @@ async function FishBaitPurchase_run(view, roomId) {
       pending = false;
       completed++;
       cost += quote.price * 4;
-      if (group < 2 && !fishBaitPurchase.stop) await sleep(700);
+      if (group < 2 && !fishBaitPurchase.stop) await sleep(350);
     }
     view.status(`${fishBaitPurchase.stop ? "已停止" : "鱼饵购买结束"}：${summary()}。重新打开鱼饵面板查看库存。`);
   } catch (error) {
