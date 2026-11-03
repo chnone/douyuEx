@@ -146,10 +146,18 @@ function renderBarragePanelTip() {
             directReply.id = "barrage-panel-tip__direct-reply";
             directReply.textContent = "直接回复";
         }
-        // 只置顶插件按钮，原生功能（包括房间特有按钮）保留原节点和相对顺序。
-        const firstNative = Array.from(dom.children).find(button => button !== directReply && button !== plusOne) || null;
-        if (plusOne.nextElementSibling !== firstNative) dom.insertBefore(plusOne, firstNative);
-        if (directReply.nextElementSibling !== plusOne) dom.insertBefore(directReply, plusOne);
+        const native = Array.from(dom.children).filter(button => button !== directReply && button !== plusOne);
+        const lowPriority = button => /^(赞|举报)$/.test(button.textContent.trim());
+        const ordered = [directReply, plusOne, ...native.filter(button => !lowPriority(button)), ...native.filter(lowPriority)];
+        // 移动原节点保留原生事件；仅将赞和举报放到所有其他功能之后。
+        ordered.forEach((button, index) => {
+            if (dom.children[index] !== button) dom.insertBefore(button, dom.children[index] || null);
+        });
+        const nativeLabel = dom.querySelector(".danmuMenuButtonLabel-9d78f6");
+        if (nativeLabel) {
+            const fontSize = getComputedStyle(nativeLabel).fontSize;
+            for (const button of [directReply, plusOne]) BarragePanelTip_setStyle(button, "font-size", fontSize);
+        }
         const disabled = !reply || reply.classList.contains("labelfisrtDisabled-8f6f35") || reply.getAttribute("aria-disabled") === "true";
         if (directReply.disabled !== disabled) directReply.disabled = disabled;
         const title = disabled ? "当前房间未提供可用的原生回复" : "立即发送 @昵称：原弹幕内容";

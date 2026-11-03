@@ -137,7 +137,7 @@ function setupTipBar({ hasReply = true, hasContainer = true, extra = [] } = {}) 
       const id = selector.match(/\[id='([^']+)'\]/)?.[1];
       const found = [];
       for (const child of this.children) {
-        if (child.id === id) found.push(child);
+        if (id ? child.id === id : selector.startsWith('.') && child.classList.contains(selector.slice(1))) found.push(child);
         found.push(...child.querySelectorAll(selector));
       }
       return found;
@@ -174,11 +174,11 @@ function setupTipBar({ hasReply = true, hasContainer = true, extra = [] } = {}) 
   };
 }
 
-test('播放器操作栏首行固定直接回复和+1，原生按钮保留原节点和相对顺序', () => {
+test('播放器操作栏首行固定直接回复和+1，原生按钮保留原节点，赞和举报放最后', () => {
   const env = setupTipBar();
   const original = Object.values(env.native), separator = env.bar.children[1];
   env.render();
-  assert.deepEqual(env.actions(), ['直接回复', '+1', '赞', '举报', '回复', '收藏']);
+  assert.deepEqual(env.actions(), ['直接回复', '+1', '回复', '收藏', '赞', '举报']);
   assert.ok(env.bar.className.includes('ex-barrage-tip-actions'));
   assert.equal(env.bar.children.filter(node => node.tag === 'p').length, 1);
   assert.ok(env.bar.children.includes(separator));
@@ -211,18 +211,18 @@ test('直接回复保持绑定当前原生回复，宿主替换回复节点后�
   env.bar.children.splice(env.bar.children.indexOf(old), 1); old.parentElement = null;
   env.render(); direct.click();
   assert.equal(selected[1], replacement);
-  assert.deepEqual(env.actions(), ['直接回复', '+1', '赞', '举报', '回复', '收藏']);
+  assert.deepEqual(env.actions(), ['直接回复', '+1', '回复', '收藏', '赞', '举报']);
   assert.deepEqual(env.sent, []);
 });
 
 test('没有原生回复时首行仍固定，直接回复禁用；出现后恢复且无重复', () => {
   const env = setupTipBar({ hasReply: false }); env.render();
-  assert.deepEqual(env.actions(), ['直接回复', '+1', '赞', '举报', '收藏']);
+  assert.deepEqual(env.actions(), ['直接回复', '+1', '收藏', '赞', '举报']);
   const direct = env.bar.querySelector("[id='barrage-panel-tip__direct-reply']");
   assert.equal(direct.disabled, true); direct.click(); assert.deepEqual(env.sent, []);
   const reply = new env.Element('a', '回复'); reply.className = 'labelfisrt-407af4';
   env.bar.insertBefore(reply, env.native['收藏']); env.render();
-  assert.deepEqual(env.actions(), ['直接回复', '+1', '赞', '举报', '回复', '收藏']);
+  assert.deepEqual(env.actions(), ['直接回复', '+1', '回复', '收藏', '赞', '举报']);
   assert.equal(direct.disabled, false);
   const absent = setupTipBar({ hasContainer: false }); absent.context.renderBarragePanelTip();
   assert.deepEqual(absent.actions(), ['赞', '举报', '回复', '收藏']);
@@ -232,10 +232,28 @@ test('不同房间的额外功能全部保留，原生回复禁用时不能绕�
   const env = setupTipBar({ extra: ['加一', '徽章', '其他功能', '房管'] });
   env.native['回复'].className += ' labelfisrtDisabled-8f6f35';
   env.render();
-  assert.deepEqual(env.actions(), ['直接回复', '+1', '赞', '举报', '回复', '收藏', '加一', '徽章', '其他功能', '房管']);
+  assert.deepEqual(env.actions(), ['直接回复', '+1', '回复', '收藏', '加一', '徽章', '其他功能', '房管', '赞', '举报']);
   assert.equal(env.bar.querySelector("[id='barrage-panel-tip__direct-reply']").disabled, true);
   for (const name of ['加一', '徽章', '其他功能', '房管']) env.native[name].click();
   assert.deepEqual(env.nativeClicks, ['加一', '徽章', '其他功能', '房管']);
+});
+
+test('第一排跟随原生标签字号，字号变化后重新同步', () => {
+  const env = setupTipBar(); env.render();
+  const label = new env.Element('span'); label.className = 'danmuMenuButtonLabel-9d78f6';
+  env.native['回复'].appendChild(label);
+  for (const id of ['barrage-panel-tip__direct-reply', 'barrage-panel-tip__+1']) {
+    const values = new Map();
+    env.bar.querySelector(`[id='${id}']`).style = {
+      getPropertyValue: name => values.get(name), setProperty: (name, value) => values.set(name, value)
+    };
+  }
+  for (const fontSize of ['16px', '18px']) {
+    env.context.getComputedStyle = () => ({ fontSize }); env.render();
+    for (const id of ['barrage-panel-tip__direct-reply', 'barrage-panel-tip__+1']) {
+      assert.equal(env.bar.querySelector(`[id='${id}']`).style.getPropertyValue('font-size'), fontSize);
+    }
+  }
 });
 
 test('固定两列和泡泡尺寸样式仅作用于播放器操作栏，不再按剩余宽度随机换行', () => {
