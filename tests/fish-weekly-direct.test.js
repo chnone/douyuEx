@@ -12,7 +12,7 @@ const config = { data: { fishingConfig: { fishConfig: {
     { accType: 2, achieveNum: 5, awardType: 1, awardName: '鱼丸', num: 1000 }
   ] }
 } } } };
-function setup({ cards, post, pause, configError = false } = {}) {
+function setup({ cards, post, pause, rewardConfig = config, configError = false } = {}) {
   cards ||= [{ accType: 1, count: 100, status: 1 }, { accType: 8, count: 1, fishId: 12, status: 1 }];
   const requests = [], statuses = [], waits = [], busy = [];
   let active = 0, maxActive = 0, configRequests = 0;
@@ -24,7 +24,7 @@ function setup({ cards, post, pause, configError = false } = {}) {
       configRequests++;
       assert.equal(options.anonymous, true);
       if (configError) options.onerror();
-      else options.onload({ status: 200, responseText: 'DYConfigCallback(' + JSON.stringify(config) + ');' });
+      else options.onload({ status: 200, responseText: 'DYConfigCallback(' + JSON.stringify(rewardConfig) + ');' });
     },
     fetch: async (url, options) => {
       requests.push({ url, options });
@@ -34,7 +34,9 @@ function setup({ cards, post, pause, configError = false } = {}) {
           const params = new URLSearchParams(options.body);
           const result = await post?.(env, params);
           if (result) return result;
-          cards.find(card => Number(card.accType) === Number(params.get('accType'))).status = 2;
+          cards.find(card => Number(card.accType) === Number(params.get('accType')) &&
+            Number(card.count) === Number(params.get('count')) &&
+            (Number(card.accType) !== 8 || Number(card.fishId) === Number(params.get('fishId')))).status = 2;
           return { ok: true, json: async () => ({ error: 0 }) };
         }
         return { ok: true, json: async () => ({ error: 0, data: { accList: structuredClone(cards) } }) };
@@ -66,7 +68,79 @@ test('无需页面DOM，逐张领取我的周奖励；鱼类和成就参数正�
   }
   assert.equal(new URLSearchParams(env.posts()[0].options.body).has('fishId'), false);
   assert.equal(new URLSearchParams(env.posts()[1].options.body).get('fishId'), '12');
-  assert.match(env.statuses.at(-1), /领取结束：已确认领取 2 张；鱼丸×500、鱼丸×50/);
+  assert.equal(env.statuses.at(-1), '领取结束：已确认领取 2 张；鱼丸×550');
+});
+
+function rewardsFixture(rewards) {
+  return {
+    cards: rewards.map((_, index) => ({ accType: 1, count: index + 1, status: 1 })),
+    rewardConfig: { data: { fishingConfig: { fishConfig: {
+      fishList: [],
+      achieve: { weekAwardAchieveList: rewards.map(([awardName, num], index) => ({
+        accType: 1, achieveNum: index + 1, awardType: 1, awardName, num
+      })) }
+    } } } }
+  };
+}
+
+test('截图中的五张陪伴印章奖励按60+30+10+10+10合并为120，领取请求保持逐张', async () => {
+  const env = setup(rewardsFixture([60, 30, 10, 10, 10].map(num => ['陪伴印章', num])));
+  await env.run();
+  assert.equal(env.statuses.at(-1), '领取结束：已确认领取 5 张；陪伴印章×120');
+  assert.equal(env.posts().length, 5);
+  assert.equal(env.maxActive(), 1);
+  assert.deepEqual(env.posts().map(call => new URLSearchParams(call.options.body).get('count')), ['1', '2', '3', '4', '5']);
+  assert.equal(env.statuses.filter(text => /^已领取 /.test(text)).length, 5);
+  assert.ok(env.statuses.includes('已领取 1/5 张：陪伴印章×60'));
+});
+
+test('多种奖励分别合计并保持首次出现顺序，数字字符串数量也能合并', async () => {
+  const env = setup(rewardsFixture([
+    ['陪伴印章', '60'], ['鱼丸', 50], ['陪伴印章', 30], ['改名卡', 1], ['鱼丸', '100']
+  ]));
+  await env.run();
+  assert.equal(env.statuses.at(-1), '领取结束：已确认领取 5 张；陪伴印章×90、鱼丸×150、改名卡×1');
+});
+
+test('中途停止仅合并已确认成功的奖励，不把未提交卡片算入', async () => {
+  const env = setup({
+    ...rewardsFixture([60, 30, 10].map(num => ['陪伴印章', num])),
+    pause: env => { if (env.posts().length === 2) env.stop(); }
+  });
+  await env.run();
+  assert.equal(env.statuses.at(-1), '已停止：已确认领取 2 张；陪伴印章×90');
+  assert.equal(env.posts().length, 2);
+});
+
+test('部分成功后接口报错，汇总不包含失败请求且不自动重试', async () => {
+  const env = setup({
+    ...rewardsFixture([60, 30, 10].map(num => ['陪伴印章', num])),
+    post: env => env.posts().length === 3 ? { ok: true, json: async () => ({ error: 9, msg: '操作频繁' }) } : undefined
+  });
+  await env.run(); await env.run();
+  assert.equal(env.statuses.at(-1), '已停止：已确认领取 2 张；陪伴印章×90。操作频繁。请刷新核对后再试。');
+  assert.equal(env.posts().length, 3);
+});
+
+test('未知或非法数量保留原名称，既不默认计为1也不从名称尾部猜数量', async () => {
+  const invalidAmounts = [undefined, null, '', '未知', -1, 0, 1.5, true, false];
+  const env = setup(rewardsFixture([
+    ['陪伴印章', 60], ...invalidAmounts.map(num => ['陪伴印章', num]), ['陪伴印章', '30'], ['礼包×10', undefined]
+  ]));
+  await env.run();
+  assert.equal(env.statuses.at(-1), `领取结束：已确认领取 12 张；陪伴印章×90、${invalidAmounts.map(() => '陪伴印章').join('、')}、礼包×10`);
+});
+
+test('合计超过安全整数时保留原数量，不展示舍入后的错误总数', async () => {
+  const env = setup(rewardsFixture([['鱼丸', Number.MAX_SAFE_INTEGER], ['鱼丸', 1]]));
+  await env.run();
+  assert.equal(env.statuses.at(-1), `领取结束：已确认领取 2 张；鱼丸×${Number.MAX_SAFE_INTEGER}、鱼丸×1`);
+});
+
+test('缺失或空白奖励名不能凭通用占位名判为同一种道具', async () => {
+  const env = setup(rewardsFixture([[undefined, 10], [null, 20], ['', 30], ['  ', 40]]));
+  await env.run();
+  assert.equal(env.statuses.at(-1), '领取结束：已确认领取 4 张；图鉴奖励×10、图鉴奖励×20、图鉴奖励×30、图鉴奖励×40');
 });
 
 test('跳过未达成、已领取、不可领、无奖励卡片并去重', async () => {
@@ -83,9 +157,10 @@ test('跳过未达成、已领取、不可领、无奖励卡片并去重', async
 test('随机间隔期间停止，不提交下一张；下次手动点击重新读取', async () => {
   const env = setup({ pause: env => env.stop() }); await env.run();
   assert.equal(env.posts().length, 1);
-  assert.match(env.statuses.at(-1), /已停止：已确认领取 1 张/);
+  assert.equal(env.statuses.at(-1), '已停止：已确认领取 1 张；鱼丸×500');
   await env.run(); assert.equal(env.posts().length, 2);
   assert.equal(env.configRequests(), 2);
+  assert.equal(env.statuses.at(-1), '领取结束：已确认领取 1 张；鱼丸×50');
 });
 
 test('在途领取成功后停止仍统计结果，重复启动不产生并行任务', async () => {

@@ -79,6 +79,11 @@
     cursor: pointer;
 }
 
+#comment-dzjy-container .ex-barrage-tip-actions > button:not(:disabled):hover,
+#comment-dzjy-container .ex-barrage-tip-actions > button:not(:disabled):focus-visible {
+    color: #ff5d23;
+}
+
 #comment-dzjy-container .ex-barrage-tip-actions > button:disabled {
     color: #999;
     cursor: default;

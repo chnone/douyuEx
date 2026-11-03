@@ -248,6 +248,12 @@ test('固定两列和泡泡尺寸样式仅作用于播放器操作栏，不再�
   assert.ok(!/^\.thirdBtn-06cde5/m.test(css));
 });
 
+test('第一排按钮悬停和键盘聚焦高亮，禁用按钮不高亮', () => {
+  const css = source('BarragePanel.css');
+  assert.match(css, /button:not\(:disabled\):hover,\s*#comment-dzjy-container \.ex-barrage-tip-actions > button:not\(:disabled\):focus-visible\s*\{\s*color: #ff5d23;/);
+  assert.match(css, /button:disabled\s*\{\s*color: #999;/);
+});
+
 test('外层泡泡按播放器与真实裁剪祖先交集钳位，忽略零高挂载点并保持宿主定位', () => {
   const env = setupTipBar();
   const makeStyle = () => {

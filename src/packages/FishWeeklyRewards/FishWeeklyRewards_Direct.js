@@ -87,11 +87,33 @@ function FishWeeklyRewards_candidates(data, config, roomId) {
     const key = FishWeeklyRewards_cardKey(params);
     if (seen.has(key)) return [];
     seen.add(key);
-    const name = typeof award.awardName === "string" ? award.awardName : "图鉴奖励";
-    const amount = Number(award.num);
-    const reward = Number.isSafeInteger(amount) && amount > 0 ? `${name}×${amount}` : name;
-    return [{ key, params, reward }];
+    const rewardName = typeof award.awardName === "string" && award.awardName.trim() ? award.awardName : null;
+    const name = rewardName || "图鉴奖励";
+    const amount = typeof award.num === "number" || typeof award.num === "string" ? Number(award.num) : NaN;
+    const rewardAmount = Number.isSafeInteger(amount) && amount > 0 ? amount : null;
+    const reward = rewardAmount === null ? name : `${name}×${rewardAmount}`;
+    return [{ key, params, reward, rewardName, rewardAmount }];
   });
+}
+
+function FishWeeklyRewards_formatRewards(rewards) {
+  const rows = [], totals = new Map();
+  for (const item of rewards) {
+    // 直接累计配置中的数量，不从展示文案猜数量；未知数量保留原文。
+    if (!item.rewardName || !Number.isSafeInteger(item.rewardAmount) || item.rewardAmount <= 0) {
+      rows.push({ text: item.reward });
+      continue;
+    }
+    const previous = totals.get(item.rewardName);
+    if (previous && Number.isSafeInteger(previous.amount + item.rewardAmount)) {
+      previous.amount += item.rewardAmount;
+    } else {
+      const row = { name: item.rewardName, amount: item.rewardAmount };
+      rows.push(row);
+      totals.set(item.rewardName, row);
+    }
+  }
+  return rows.map(row => row.text ?? `${row.name}×${row.amount}`).join("、");
 }
 
 async function FishWeeklyRewards_runDirect(view, roomId) {
@@ -100,7 +122,7 @@ async function FishWeeklyRewards_runDirect(view, roomId) {
   fishWeeklyRewards.stop = false;
   const rewards = [];
   let completed = 0, skipped = 0;
-  const summary = () => `已确认领取 ${completed} 张${skipped ? `，跳过 ${skipped} 张已变化卡片` : ""}${rewards.length ? `；${rewards.join("、")}` : ""}`;
+  const summary = () => `已确认领取 ${completed} 张${skipped ? `，跳过 ${skipped} 张已变化卡片` : ""}${rewards.length ? `；${FishWeeklyRewards_formatRewards(rewards)}` : ""}`;
   view.busy(true);
   try {
     if (!/^[1-9]\d*$/.test(String(roomId))) throw new Error("未识别到直播间");
@@ -126,7 +148,7 @@ async function FishWeeklyRewards_runDirect(view, roomId) {
         await FishWeeklyRewards_request("takeAcc", candidate.params, true);
         // 与官方页面一致，明确成功响应才计数；停止后仍统计在途请求的结果。
         completed++;
-        rewards.push(candidate.reward);
+        rewards.push(candidate);
         view.status(`已领取 ${completed}/${queue.length} 张：${candidate.reward}`);
       }
     }
